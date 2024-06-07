@@ -17,20 +17,20 @@ use manifest::Manifest;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = DockerClient::new();
 
-    //    let image_name = "ghcr.io/aquasecurity/trivy:0.52.0".parse()?;
-    //    dbg!(&image_name);
-    //    let manifest = client.get_manifest(&image_name).await?;
-    //    dbg!(&manifest);
+    let image_name = "ghcr.io/aquasecurity/trivy:0.52.0".parse()?;
+    dbg!(&image_name);
+    let manifest = client.get_manifest(&image_name).await?;
+    dbg!(&manifest);
 
-    //    let image_name = "archlinux:latest".parse()?;
-    //    dbg!(&image_name);
-    //    let manifest = client.get_manifest(&image_name).await?;
-    //    dbg!(&manifest);
+    let image_name = "archlinux:latest".parse()?;
+    dbg!(&image_name);
+    let manifest = client.get_manifest(&image_name).await?;
+    dbg!(&manifest);
 
-    // let image_name = "quay.io/argoproj/argocd:latest".parse()?;
-    // dbg!(&image_name);
-    // let manifest = client.get_manifest(&image_name).await?;
-    // dbg!(&manifest);
+    let image_name = "quay.io/argoproj/argocd:latest".parse()?;
+    dbg!(&image_name);
+    let manifest = client.get_manifest(&image_name).await?;
+    dbg!(&manifest);
 
     let image_name =
         "quay.io/openshift-community-operators/external-secrets-operator:v0.9.9".parse()?;
@@ -106,7 +106,7 @@ impl DockerClient {
         }
 
         let token_url = Url::parse(&format!(
-            "https://quay.io/token?scope=repository:{}/{}:pull",
+            "https://ghcr.io/token?scope=repository:{}/{}:pull",
             image_name.repository, image_name.image_name
         ))?;
 
