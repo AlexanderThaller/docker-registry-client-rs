@@ -1,57 +1,33 @@
 use reqwest::{
     header::HeaderMap,
-    Client,
+    Client as HTTPClient,
 };
 use url::Url;
 
-mod image_name;
-mod manifest;
-
-use image_name::{
-    ImageName,
-    Registry,
+use crate::{
+    image_name::{
+        ImageName,
+        Registry,
+    },
+    manifest::Manifest,
 };
-use manifest::Manifest;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = DockerClient::new();
-
-    let image_name = "ghcr.io/aquasecurity/trivy:0.52.0".parse()?;
-    dbg!(&image_name);
-    let manifest = client.get_manifest(&image_name).await?;
-    dbg!(&manifest);
-
-    let image_name = "archlinux:latest".parse()?;
-    dbg!(&image_name);
-    let manifest = client.get_manifest(&image_name).await?;
-    dbg!(&manifest);
-
-    let image_name = "quay.io/argoproj/argocd:latest".parse()?;
-    dbg!(&image_name);
-    let manifest = client.get_manifest(&image_name).await?;
-    dbg!(&manifest);
-
-    let image_name =
-        "quay.io/openshift-community-operators/external-secrets-operator:v0.9.9".parse()?;
-    dbg!(&image_name);
-    let manifest = client.get_manifest(&image_name).await?;
-    dbg!(&manifest);
-
-    Ok(())
+#[derive(Debug, Default, Clone)]
+pub struct Client {
+    client: HTTPClient,
 }
 
-struct DockerClient {
-    client: Client,
-}
-
-impl DockerClient {
+impl Client {
+    #[must_use]
     pub fn new() -> Self {
-        Self {
-            client: Client::new(),
-        }
+        Self::default()
     }
 
+    /// # Errors
+    /// Returns an error if the request fails.
+    /// Returns an error if the response body is not valid JSON.
+    /// Returns an error if the response body is not a valid manifest.
+    /// Returns an error if the response status is not successful.
     pub async fn get_manifest(
         &self,
         image_name: &ImageName,
@@ -84,8 +60,8 @@ impl DockerClient {
 
         match serde_json::from_str(&body) {
             Err(err) => {
-                let value: serde_json::Value = serde_json::from_str(&body).unwrap();
-                println!("{}", serde_json::to_string_pretty(&value).unwrap());
+                let value: serde_json::Value = serde_json::from_str(&body)?;
+                println!("{}", serde_json::to_string_pretty(&value)?);
 
                 Err(err.into())
             }

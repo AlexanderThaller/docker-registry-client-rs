@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::Arc,
+};
 
 use chrono::{
     DateTime,
@@ -25,7 +28,7 @@ pub enum Manifest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct Image {
+pub struct Image {
     #[serde(rename = "schemaVersion")]
     schema_version: SchemaVersion,
 
@@ -38,18 +41,18 @@ pub(super) struct Image {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct List {
+pub struct List {
     #[serde(rename = "schemaVersion")]
     schema_version: SchemaVersion,
 
     #[serde(rename = "mediaType")]
     media_type: String,
 
-    manifests: Vec<ManifestEntry>,
+    pub manifests: Vec<ManifestEntry>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct Single {
+pub struct Single {
     #[serde(rename = "schemaVersion")]
     schema_version: SchemaVersion,
 
@@ -70,18 +73,18 @@ pub(super) enum SchemaVersion {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct ManifestEntry {
+pub struct ManifestEntry {
     #[serde(rename = "mediaType")]
-    media_type: String,
-    size: u64,
-    digest: String,
-    platform: Platform,
+    pub media_type: String,
+    pub size: u64,
+    pub digest: String,
+    pub platform: Platform,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct Platform {
-    architecture: Architecture,
-    os: OperatingSystem,
+pub struct Platform {
+    pub architecture: Architecture,
+    pub os: OperatingSystem,
 
     #[serde(rename = "os.version")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -101,7 +104,7 @@ pub(super) struct Platform {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub(super) enum Architecture {
+pub enum Architecture {
     #[serde(rename = "386")]
     I386,
 
@@ -124,7 +127,7 @@ pub(super) enum Architecture {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub(super) enum OperatingSystem {
+pub enum OperatingSystem {
     Aix,
     Android,
     Darwin,
@@ -294,6 +297,55 @@ impl<'de> Deserialize<'de> for SchemaVersion {
             2 => Ok(Self::V2),
             _ => Err(serde::de::Error::custom("invalid enum value")),
         }
+    }
+}
+
+impl std::fmt::Display for Architecture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let out = match self {
+            Self::I386 => "386",
+            Self::Amd64 => "amd64",
+            Self::Arm => "arm",
+            Self::Arm64 => "arm64",
+            Self::Loong64 => "loong64",
+            Self::Mips => "mips",
+            Self::Mips64 => "mips64",
+            Self::Mips64le => "mips64le",
+            Self::Mipsle => "mipsle",
+            Self::Ppc64 => "ppc64",
+            Self::Ppc64le => "ppc64le",
+            Self::Riscv64 => "riscv64",
+            Self::S390x => "s390x",
+            Self::Wasm => "wasm",
+            Self::Unknown => "unknown",
+        };
+
+        f.write_str(out)
+    }
+}
+
+impl std::fmt::Display for OperatingSystem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let out = match self {
+            Self::Aix => "aix",
+            Self::Android => "android",
+            Self::Darwin => "darwin",
+            Self::Dragonfly => "dragonfly",
+            Self::Freebsd => "freebsd",
+            Self::Illumos => "illumos",
+            Self::Ios => "ios",
+            Self::Js => "js",
+            Self::Linux => "linux",
+            Self::Netbsd => "netbsd",
+            Self::Openbsd => "openbsd",
+            Self::Plan9 => "plan9",
+            Self::Solaris => "solaris",
+            Self::Wasip1 => "wasip1",
+            Self::Windows => "windows",
+            Self::Unknown => "unknown",
+        };
+
+        f.write_str(out)
     }
 }
 

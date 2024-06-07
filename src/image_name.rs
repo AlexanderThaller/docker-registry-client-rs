@@ -1,10 +1,11 @@
 use either::Either;
 
 #[derive(Debug)]
-pub(super) enum FromStrError {}
+#[non_exhaustive]
+pub enum FromStrError {}
 
 #[derive(Debug, PartialEq)]
-pub(super) struct ImageName {
+pub struct ImageName {
     pub(super) registry: Registry,
     pub(super) repository: String,
     pub(super) image_name: String,
@@ -31,7 +32,7 @@ pub enum Tag {
 pub struct Digest(String);
 
 impl std::fmt::Display for FromStrError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
 }
@@ -45,7 +46,7 @@ impl std::str::FromStr for ImageName {
         let components = s.split('/').collect::<Vec<_>>();
 
         let registry = if components.len() == 3 {
-            match components[0] {
+            match *components.first().expect("already checked the length") {
                 "docker.io" => Registry::DockerHub,
                 "ghcr.io" => Registry::Github,
                 "quay.io" => Registry::Quay,
@@ -103,7 +104,7 @@ impl Registry {
 }
 
 impl std::fmt::Display for Tag {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Latest => write!(f, "latest"),
             Self::Specific(s) => write!(f, "{s}"),
@@ -112,7 +113,7 @@ impl std::fmt::Display for Tag {
 }
 
 impl std::fmt::Display for Digest {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }

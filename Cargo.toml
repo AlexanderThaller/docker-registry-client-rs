@@ -1,5 +1,5 @@
 [package]
-name = "docker-registry-client-rs"
+name = "docker-registry-client"
 version = "0.1.0"
 edition = "2021"
 
