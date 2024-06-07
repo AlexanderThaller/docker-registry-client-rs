@@ -1,0 +1,20 @@
+[package]
+name = "docker-registry-client-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+either = "1"
+reqwest = { version = "0.12", features = ["json"] }
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+url = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+insta = "1"
+pretty_assertions = "1"
+
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3
