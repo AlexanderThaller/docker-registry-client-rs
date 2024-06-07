@@ -11,7 +11,7 @@ use image_name::{
     ImageName,
     Registry,
 };
-use manifest::List;
+use manifest::Manifest;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -27,7 +27,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //    let manifest = client.get_manifest(&image_name).await?;
     //    dbg!(&manifest);
 
-    let image_name = "quay.io/argoproj/argocd:latest".parse()?;
+    // let image_name = "quay.io/argoproj/argocd:latest".parse()?;
+    // dbg!(&image_name);
+    // let manifest = client.get_manifest(&image_name).await?;
+    // dbg!(&manifest);
+
+    let image_name =
+        "quay.io/openshift-community-operators/external-secrets-operator:v0.9.9".parse()?;
     dbg!(&image_name);
     let manifest = client.get_manifest(&image_name).await?;
     dbg!(&manifest);
@@ -49,7 +55,7 @@ impl DockerClient {
     pub async fn get_manifest(
         &self,
         image_name: &ImageName,
-    ) -> Result<List, Box<dyn std::error::Error>> {
+    ) -> Result<Manifest, Box<dyn std::error::Error>> {
         let mut headers = match image_name.registry {
             Registry::DockerHub => self.get_dockerio_headers(image_name).await?,
             Registry::Github => self.get_ghcr_headers(image_name).await?,
@@ -84,7 +90,7 @@ impl DockerClient {
                 Err(err.into())
             }
 
-            Ok(list) => Ok(list),
+            Ok(v) => Ok(v),
         }
     }
 

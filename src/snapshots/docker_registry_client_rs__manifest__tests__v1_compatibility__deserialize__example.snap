@@ -1,0 +1,175 @@
+---
+source: src/manifest.rs
+expression: out
+---
+[
+  {
+    "id": "c7bf5caf6235f950cb1c841b5a2d7f18a000e04187127a1d4009542ab4775f06",
+    "created": "2023-11-13T21:13:14.275150241Z",
+    "container": "69bab8c433a80ab7d521ceebafa441a0097635ab2f2dfa4646928d584863a354",
+    "container_config": {
+      "Hostname": "f37b78f411fe",
+      "Domainname": "",
+      "User": "",
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "AttachStderr": false,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "Cmd": [],
+      "Image": "",
+      "Volumes": {},
+      "WorkingDir": "",
+      "Entrypoint": [],
+      "OnBuild": [],
+      "Labels": {
+        "io.buildah.version": "1.31.2",
+        "operators.operatorframework.io.bundle.channel.default.v1": "alpha",
+        "operators.operatorframework.io.bundle.channels.v1": "alpha,stable",
+        "operators.operatorframework.io.bundle.manifests.v1": "manifests/",
+        "operators.operatorframework.io.bundle.mediatype.v1": "registry+v1",
+        "operators.operatorframework.io.bundle.metadata.v1": "metadata/",
+        "operators.operatorframework.io.bundle.package.v1": "external-secrets-operator",
+        "operators.operatorframework.io.metrics.builder": "operator-sdk-v1.32.0",
+        "operators.operatorframework.io.metrics.mediatype.v1": "metrics+v1",
+        "operators.operatorframework.io.metrics.project_layout": "helm.sdk.operatorframework.io/v1",
+        "operators.operatorframework.io.test.config.v1": "tests/scorecard/",
+        "operators.operatorframework.io.test.mediatype.v1": "scorecard+v1"
+      }
+    }
+  },
+  {
+    "id": "f33801be63d70cfae74cead4108a8821735dc59b6d127c450af17e3571c7c762",
+    "created": "2023-11-13T21:13:14.000459746Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) COPY dir:6c7a7f84844089c52c6b8e8d54c065fd68514dd5366855e4b9561e20b823a5ab in metadata/ "
+      ]
+    }
+  },
+  {
+    "id": "93cadf30bf3e44c8296171388cdac5c6cf9a4b52d52d1fa15d099d246fd80c7f",
+    "created": "2023-11-13T21:13:13.675111160Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) COPY dir:9c7a5f8fedd375bab9de8f18db2b4883ecf93dd0f50b8effcc370ddd3fbf001e in manifests/ "
+      ]
+    }
+  },
+  {
+    "id": "57b92c73230c62a8f6131ad8ec5690dc3e966bc6092db6ee481a88b9b2b6a429",
+    "created": "2023-11-13T21:13:13.435346221Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.test.config.v1=\"tests/scorecard/\""
+      ]
+    }
+  },
+  {
+    "id": "34100da5db7d6dee1e26d09918e20166556d75d69e6e1d0acadbb49d13aa73c9",
+    "created": "2023-11-13T21:13:13.413086539Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.test.mediatype.v1=\"scorecard+v1\""
+      ]
+    }
+  },
+  {
+    "id": "a0d4ad6d6352bf3e9beae315c3f02bbc387e7aa7d36e460568939e0ec8c6d3fe",
+    "created": "2023-11-13T21:13:13.392067422Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.metrics.project_layout=\"helm.sdk.operatorframework.io/v1\""
+      ]
+    }
+  },
+  {
+    "id": "43aa38853a25dacff35a8ef426100506a50c77644193485804c24f1d4ab61f74",
+    "created": "2023-11-13T21:13:13.372556885Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.metrics.mediatype.v1=\"metrics+v1\""
+      ]
+    }
+  },
+  {
+    "id": "58feba41332527cbbf123f8adfe5035b9dd1cc757b6f1ae1447717bca7d27bd2",
+    "created": "2023-11-13T21:13:13.350057290Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.metrics.builder=\"operator-sdk-v1.32.0\""
+      ]
+    }
+  },
+  {
+    "id": "454e93962ea645907be755e537be6b92cd4ba1d7da41989df637cdd03e9e605f",
+    "created": "2023-11-13T21:13:13.328967869Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.bundle.channel.default.v1=\"alpha\""
+      ]
+    }
+  },
+  {
+    "id": "7b1a9a9f550b877474e712a8ad30aeca7e2d4c515788cd60bacfc6b934a929bd",
+    "created": "2023-11-13T21:13:13.308883502Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.bundle.channels.v1=\"alpha,stable\""
+      ]
+    }
+  },
+  {
+    "id": "19efb52a34eee346203b86d6b8eb10aa209ab76cbe5339e25b1ff3d83104e468",
+    "created": "2023-11-13T21:13:13.287220951Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.bundle.package.v1=\"external-secrets-operator\""
+      ]
+    }
+  },
+  {
+    "id": "2800cd4f27c1b2abbac1d7ccfa0684918442840f1e754dff902c08a0961d9a25",
+    "created": "2023-11-13T21:12:39.986478742Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.bundle.metadata.v1=\"metadata/\""
+      ]
+    }
+  },
+  {
+    "id": "f83accb94bcd57c2016c82699719d5f5d67bc999e53c3877ab9b57624c700aaf",
+    "created": "2023-11-13T21:12:39.971390952Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.bundle.manifests.v1=\"manifests/\""
+      ]
+    }
+  },
+  {
+    "id": "f5e7a25ca595ca79ac6fc324795ba546148f41b926de46466da78a4c373dc136",
+    "created": "2023-11-13T21:12:39.953326806Z",
+    "container": null,
+    "container_config": {
+      "Cmd": [
+        "/bin/sh -c #(nop) LABEL operators.operatorframework.io.bundle.mediatype.v1=\"registry+v1\""
+      ]
+    }
+  }
+]
