@@ -1,8 +1,6 @@
 #![allow(dead_code)]
 
-use std::{
-    collections::BTreeMap,
-};
+use std::collections::BTreeMap;
 
 use chrono::{
     DateTime,
@@ -29,14 +27,14 @@ pub enum Manifest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Image {
     #[serde(rename = "schemaVersion")]
-    schema_version: SchemaVersion,
+    pub schema_version: SchemaVersion,
 
     #[serde(rename = "mediaType")]
-    media_type: String,
+    pub media_type: String,
 
-    config: Config,
+    pub config: Config,
 
-    layers: Vec<Layer>,
+    pub layers: Vec<Layer>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -53,20 +51,20 @@ pub struct List {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Single {
     #[serde(rename = "schemaVersion")]
-    schema_version: SchemaVersion,
+    pub schema_version: SchemaVersion,
 
-    name: String,
-    tag: String,
-    architecture: Architecture,
+    pub name: String,
+    pub tag: String,
+    pub architecture: Architecture,
 
     #[serde(rename = "fsLayers")]
-    fs_layers: Vec<FsLayer>,
+    pub fs_layers: Vec<FsLayer>,
 
-    history: Vec<History>,
+    pub history: Vec<History>,
 }
 
 #[derive(Debug)]
-pub(super) enum SchemaVersion {
+pub enum SchemaVersion {
     V1,
     V2,
 }
@@ -147,15 +145,15 @@ pub enum OperatingSystem {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct Config {
+pub struct Config {
     #[serde(rename = "mediaType")]
-    media_type: String,
-    size: u64,
-    digest: String,
+    pub media_type: String,
+    pub size: u64,
+    pub digest: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct Layer {
+pub struct Layer {
     #[serde(rename = "mediaType")]
     media_type: String,
     size: u64,
@@ -167,101 +165,101 @@ pub(super) struct Layer {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct FsLayer {
+pub struct FsLayer {
     #[serde(rename = "blobSum")]
-    blob_sum: String,
+    pub blob_sum: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct History {
+pub struct History {
     #[serde(
         rename = "v1Compatibility",
         deserialize_with = "deserialize_v1_compatibility"
     )]
-    v1_compatibility: V1Compatibility,
+    pub v1_compatibility: V1Compatibility,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct V1Compatibility {
-    id: String,
-    created: DateTime<Utc>,
+pub struct V1Compatibility {
+    pub id: String,
+    pub created: DateTime<Utc>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    container: Option<String>,
+    pub container: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    container_config: Option<ContainerConfig>,
+    pub container_config: Option<ContainerConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(super) struct ContainerConfig {
+pub struct ContainerConfig {
     #[serde(rename = "Hostname")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    hostname: Option<String>,
+    pub hostname: Option<String>,
 
     #[serde(rename = "Domainname")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    domainname: Option<String>,
+    pub domainname: Option<String>,
 
     #[serde(rename = "User")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    user: Option<String>,
+    pub user: Option<String>,
 
     #[serde(rename = "AttachStdin")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    attach_stdin: Option<bool>,
+    pub attach_stdin: Option<bool>,
 
     #[serde(rename = "AttachStdout")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    attach_stdout: Option<bool>,
+    pub attach_stdout: Option<bool>,
 
     #[serde(rename = "AttachStderr")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    attach_stderr: Option<bool>,
+    pub attach_stderr: Option<bool>,
 
     #[serde(rename = "Tty")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    tty: Option<bool>,
+    pub tty: Option<bool>,
 
     #[serde(rename = "OpenStdin")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    open_stdin: Option<bool>,
+    pub open_stdin: Option<bool>,
 
     #[serde(rename = "StdinOnce")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    stdin_once: Option<bool>,
+    pub stdin_once: Option<bool>,
 
     #[serde(rename = "Env")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    env: Option<Vec<String>>,
+    pub env: Option<Vec<String>>,
 
     #[serde(rename = "Cmd")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    cmd: Option<Vec<String>>,
+    pub cmd: Option<Vec<String>>,
 
     #[serde(rename = "Image")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    image: Option<String>,
+    pub image: Option<String>,
 
     #[serde(rename = "Volumes")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    volumes: Option<BTreeMap<String, String>>,
+    pub volumes: Option<BTreeMap<String, String>>,
 
     #[serde(rename = "WorkingDir")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    working_dir: Option<String>,
+    pub working_dir: Option<String>,
 
     #[serde(rename = "Entrypoint")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    entrypoint: Option<Vec<String>>,
+    pub entrypoint: Option<Vec<String>>,
 
     #[serde(rename = "OnBuild")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_build: Option<Vec<String>>,
+    pub on_build: Option<Vec<String>>,
 
     #[serde(rename = "Labels")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    labels: Option<BTreeMap<String, String>>,
+    pub labels: Option<BTreeMap<String, String>>,
 }
 
 fn deserialize_v1_compatibility<'de, D>(deserializer: D) -> Result<V1Compatibility, D::Error>

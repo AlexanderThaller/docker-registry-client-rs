@@ -38,17 +38,19 @@ impl Client {
             _ => HeaderMap::new(),
         };
 
-        headers.insert(
-            "Accept",
-            "application/vnd.docker.distribution.manifest.list.v2+json".parse()?,
-        );
+        let accept_header = [
+            "application/vnd.docker.container.image.v1+json",
+            "application/vnd.docker.distribution.manifest.list.v2+json",
+            "application/vnd.docker.distribution.manifest.v2+json",
+            "application/vnd.docker.image.rootfs.diff.tar.gzip",
+            "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+            "application/vnd.docker.plugin.v1+json",
+            "application/vnd.oci.image.index.v1+json",
+            "application/vnd.oci.image.manifest.v1+json",
+        ]
+        .join(", ");
 
-        headers.insert(
-            "Accept",
-            "application/vnd.oci.image.manifest.v1+json".parse()?,
-        );
-
-        headers.insert("Accept", "application/vnd.oci.image.index.v1+json".parse()?);
+        headers.insert("Accept", accept_header.parse()?);
 
         let registry_domain = image_name.registry.registry_domain();
         let url = Url::parse(&format!(
