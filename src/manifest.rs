@@ -372,6 +372,15 @@ mod tests {
 
                 insta::assert_json_snapshot!(out);
             }
+
+            #[test]
+            fn vaultwarden() {
+                const INPUT: &str = include_str!("../resources/manifest/list/vaultwarden.json");
+
+                let out: List = serde_json::from_str(INPUT).unwrap();
+
+                insta::assert_json_snapshot!(out);
+            }
         }
     }
 
