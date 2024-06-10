@@ -43,6 +43,13 @@ impl Client {
             "application/vnd.docker.distribution.manifest.list.v2+json".parse()?,
         );
 
+        headers.insert(
+            "Accept",
+            "application/vnd.oci.image.manifest.v1+json".parse()?,
+        );
+
+        headers.insert("Accept", "application/vnd.oci.image.index.v1+json".parse()?);
+
         let registry_domain = image_name.registry.registry_domain();
         let url = Url::parse(&format!(
             "https://{}/v2/{}/{}/manifests/{}",
