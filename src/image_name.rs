@@ -118,6 +118,22 @@ impl std::fmt::Display for Digest {
     }
 }
 
+impl std::fmt::Display for ImageName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}/{}/{}:{}",
+            self.registry.registry_domain(),
+            self.repository,
+            self.image_name,
+            match &self.identifier {
+                Either::Left(tag) => tag.to_string(),
+                Either::Right(digest) => digest.to_string(),
+            }
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     mod from_str {

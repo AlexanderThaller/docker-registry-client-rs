@@ -45,7 +45,7 @@ pub struct List {
     #[serde(rename = "mediaType")]
     media_type: String,
 
-    pub manifests: Vec<ManifestEntry>,
+    pub manifests: Vec<Entry>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -70,7 +70,7 @@ pub enum SchemaVersion {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ManifestEntry {
+pub struct Entry {
     #[serde(rename = "mediaType")]
     pub media_type: String,
     pub size: u64,
@@ -155,13 +155,17 @@ pub struct Config {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Layer {
     #[serde(rename = "mediaType")]
-    media_type: String,
-    size: u64,
-    digest: String,
+    pub media_type: String,
+    pub size: u64,
+    pub digest: String,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    urls: Option<Vec<Url>>,
+    pub urls: Option<Vec<Url>>,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub annotations: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
