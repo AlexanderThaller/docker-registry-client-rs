@@ -4,7 +4,7 @@ use either::Either;
 #[non_exhaustive]
 pub enum FromStrError {}
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ImageName {
     pub(super) registry: Registry,
     pub(super) repository: String,
@@ -12,7 +12,7 @@ pub struct ImageName {
     pub(super) identifier: Either<Tag, Digest>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Registry {
     DockerHub,
     Github,
@@ -21,14 +21,14 @@ pub enum Registry {
     Specific(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Tag {
     Latest,
 
     Specific(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Digest(String);
 
 impl std::fmt::Display for FromStrError {

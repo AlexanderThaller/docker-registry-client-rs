@@ -8,5 +8,8 @@ pub mod docker;
 pub mod image_name;
 pub mod manifest;
 
-pub use docker::Client;
+pub use docker::{
+    Client,
+    Error as DockerError,
+};
 pub use manifest::Manifest;
