@@ -1,7 +1,7 @@
 use docker_registry_client::docker::Client;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), eyre::Error> {
     let client = Client::new();
 
     let image_name = "ghcr.io/aquasecurity/trivy:0.52.0".parse()?;

@@ -351,6 +351,7 @@ impl std::fmt::Display for OperatingSystem {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     mod list {
         mod deserialize {
