@@ -1,7 +1,13 @@
+use std::{
+    collections::HashMap,
+    sync::Arc,
+};
+
 use reqwest::{
     header::HeaderMap,
     Client as HTTPClient,
 };
+use tokio::sync::RwLock;
 use url::Url;
 
 use crate::{
@@ -19,6 +25,21 @@ pub use error::Error;
 #[derive(Debug, Default, Clone)]
 pub struct Client {
     client: HTTPClient,
+
+    token_cache: Arc<RwLock<HashMap<CacheKey, String>>>,
+}
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+struct CacheKey {
+    registry: Registry,
+    repository: String,
+    image_name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Response {
+    pub digest: Option<String>,
+    pub manifest: Manifest,
 }
 
 impl Client {
@@ -32,12 +53,8 @@ impl Client {
     /// Returns an error if the response body is not valid JSON.
     /// Returns an error if the response body is not a valid manifest.
     /// Returns an error if the response status is not successful.
-    pub async fn get_manifest(&self, image_name: &ImageName) -> Result<Manifest, Error> {
-        let mut headers = match image_name.registry {
-            Registry::DockerHub => self.get_dockerio_headers(image_name).await?,
-            Registry::Github => self.get_ghcr_headers(image_name).await?,
-            _ => HeaderMap::new(),
-        };
+    pub async fn get_manifest(&self, image_name: &ImageName) -> Result<Response, Error> {
+        let mut headers = self.get_headers(image_name).await?;
 
         let accept_header = [
             "application/vnd.docker.container.image.v1+json",
@@ -75,6 +92,17 @@ impl Client {
             .map_err(Error::GetManifest)?;
 
         let status = response.status();
+        let digest = response
+            .headers()
+            .get("Docker-Content-Digest")
+            .map(|header| {
+                header
+                    .to_str()
+                    .map(String::from)
+                    .map_err(Error::ParseDockerContentDigestHeader)
+            })
+            .transpose()?;
+
         let body = response.text().await.map_err(Error::ExtractManifestBody)?;
 
         if !status.is_success() {
@@ -85,81 +113,68 @@ impl Client {
             return Err(Error::FailedManifestRequest(status, body));
         }
 
-        serde_json::from_str(&body).map_err(|e| Error::DeserializeManifestBody(e, body))
+        let manifest =
+            serde_json::from_str(&body).map_err(|e| Error::DeserializeManifestBody(e, body))?;
+
+        Ok(Response { digest, manifest })
     }
 
-    async fn get_ghcr_headers(&self, image_name: &ImageName) -> Result<HeaderMap, Error> {
-        // https://gist.github.com/eggplants/a046346571de66656f4d4d34de69fdd0
-
+    async fn get_headers(&self, image_name: &ImageName) -> Result<HeaderMap, Error> {
         #[derive(Debug, serde::Deserialize)]
         struct Token {
             token: String,
         }
 
-        let token_url = Url::parse(&format!(
-            "https://ghcr.io/token?scope=repository:{}/{}:pull",
-            image_name.repository, image_name.image_name
-        ))
-        .map_err(Error::InvalidGHCRTokenUrl)?;
+        let cache_key = CacheKey {
+            registry: image_name.registry.clone(),
+            repository: image_name.repository.clone(),
+            image_name: image_name.image_name.clone(),
+        };
 
-        let response = self
-            .client
-            .get(token_url)
-            .send()
-            .await
-            .map_err(Error::GetGHCRToken)?;
+        let token_cache = self.token_cache.read().await;
+        let token = token_cache.get(&cache_key).cloned();
+        drop(token_cache);
 
-        let body = response.text().await.map_err(Error::ExtractGHCRTokenBody)?;
+        let token = if let Some(token) = token {
+            token
+        } else {
+            let token_url = match image_name.registry {
+                Registry::Github => format!(
+                    "https://ghcr.io/token?scope=repository:{}/{}:pull&service=ghcr.io",
+                    image_name.repository, image_name.image_name
+                ),
+                Registry::DockerHub => format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:{}/{}:pull&service=registry.docker.io", image_name.repository, image_name.image_name),
+                Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{}/{}:pull&service=quay.io", image_name.repository, image_name.image_name),
 
-        let token: Token =
-            serde_json::from_str(&body).map_err(|e| Error::DeserializeGHCRToken(e, body))?;
+                Registry::Specific(_) => return Ok(HeaderMap::new()),
+            };
 
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "Authorization",
-            format!("Bearer {}", token.token)
-                .parse()
-                .map_err(Error::ParseGHCRAuthorizationHeader)?,
-        );
+            let token_url = Url::parse(&token_url).map_err(Error::InvalidTokenUrl)?;
 
-        Ok(headers)
-    }
+            let response = self
+                .client
+                .get(token_url)
+                .send()
+                .await
+                .map_err(Error::GetToken)?;
 
-    async fn get_dockerio_headers(&self, image_name: &ImageName) -> Result<HeaderMap, Error> {
-        // https://docs.docker.com/docker-hub/download-rate-limit/
+            let body = response.text().await.map_err(Error::ExtractTokenBody)?;
 
-        #[derive(Debug, serde::Deserialize)]
-        struct Token {
-            token: String,
-        }
+            let token: Token =
+                serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
 
-        let token_url = Url::parse(&format!(
-            "https://auth.docker.io/token?service=registry.docker.io&scope=repository:{}/{}:pull",
-            image_name.repository, image_name.image_name
-        ))
-        .map_err(Error::InvalidDockerIoTokenUrl)?;
+            let mut token_cache = self.token_cache.write().await;
+            token_cache.insert(cache_key, token.token.clone());
 
-        let response = self
-            .client
-            .get(token_url)
-            .send()
-            .await
-            .map_err(Error::GetDockerIoToken)?;
-
-        let body = response
-            .text()
-            .await
-            .map_err(Error::ExtractDockerIoTokenBody)?;
-
-        let token: Token =
-            serde_json::from_str(&body).map_err(|e| Error::DeserializeDockerIoToken(e, body))?;
+            token.token
+        };
 
         let mut headers = HeaderMap::new();
         headers.insert(
             "Authorization",
-            format!("Bearer {}", token.token)
+            format!("Bearer {token}")
                 .parse()
-                .map_err(Error::ParseDockerIoAuthorizationHeader)?,
+                .map_err(Error::ParseAuthorizationHeader)?,
         );
 
         Ok(headers)

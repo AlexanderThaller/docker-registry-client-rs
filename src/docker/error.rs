@@ -9,18 +9,14 @@ pub enum Error {
     DeserializeManifestBody(serde_json::Error, String),
     ParseManifestAcceptHeader(reqwest::header::InvalidHeaderValue),
     ManifestNotFound(Url),
+    MissingDockerContentDigestHeader,
+    ParseDockerContentDigestHeader(reqwest::header::ToStrError),
 
-    InvalidGHCRTokenUrl(url::ParseError),
-    GetGHCRToken(reqwest::Error),
-    ExtractGHCRTokenBody(reqwest::Error),
-    DeserializeGHCRToken(serde_json::Error, String),
-    ParseGHCRAuthorizationHeader(reqwest::header::InvalidHeaderValue),
-
-    InvalidDockerIoTokenUrl(url::ParseError),
-    GetDockerIoToken(reqwest::Error),
-    ExtractDockerIoTokenBody(reqwest::Error),
-    DeserializeDockerIoToken(serde_json::Error, String),
-    ParseDockerIoAuthorizationHeader(reqwest::header::InvalidHeaderValue),
+    InvalidTokenUrl(url::ParseError),
+    GetToken(reqwest::Error),
+    ExtractTokenBody(reqwest::Error),
+    DeserializeToken(serde_json::Error, String),
+    ParseAuthorizationHeader(reqwest::header::InvalidHeaderValue),
 }
 
 impl std::fmt::Display for Error {
@@ -39,27 +35,21 @@ impl std::fmt::Display for Error {
                 write!(f, "Failed to parse manifest accept header: {e}")
             }
             Self::ManifestNotFound(u) => write!(f, "Manifest at url {u} was not found"),
-
-            Self::InvalidGHCRTokenUrl(e) => write!(f, "Invalid GHCR token URL: {e}"),
-            Self::GetGHCRToken(e) => write!(f, "Failed to get GHCR token: {e}"),
-            Self::ExtractGHCRTokenBody(e) => write!(f, "Failed to extract GHCR token body: {e}"),
-            Self::DeserializeGHCRToken(e, s) => {
-                write!(f, "Failed to deserialize GHCR token: {e}, body: {s}")
+            Self::MissingDockerContentDigestHeader => {
+                write!(f, "Missing Docker content digest header")
             }
-            Self::ParseGHCRAuthorizationHeader(e) => {
-                write!(f, "Failed to parse GHCR authorization header: {e}")
+            Self::ParseDockerContentDigestHeader(e) => {
+                write!(f, "Failed to parse Docker content digest header: {e}")
             }
 
-            Self::InvalidDockerIoTokenUrl(e) => write!(f, "Invalid Docker.io token URL: {e}"),
-            Self::GetDockerIoToken(e) => write!(f, "Failed to get Docker.io token: {e}"),
-            Self::ExtractDockerIoTokenBody(e) => {
-                write!(f, "Failed to extract Docker.io token body: {e}")
+            Self::InvalidTokenUrl(e) => write!(f, "Invalid token URL: {e}"),
+            Self::GetToken(e) => write!(f, "Failed to get token: {e}"),
+            Self::ExtractTokenBody(e) => write!(f, "Failed to extract token body: {e}"),
+            Self::DeserializeToken(e, s) => {
+                write!(f, "Failed to deserialize token: {e}, body: {s}")
             }
-            Self::DeserializeDockerIoToken(e, s) => {
-                write!(f, "Failed to deserialize Docker.io token: {e}, body: {s}")
-            }
-            Self::ParseDockerIoAuthorizationHeader(e) => {
-                write!(f, "Failed to parse Docker.io authorization header: {e}")
+            Self::ParseAuthorizationHeader(e) => {
+                write!(f, "Failed to parse authorization header: {e}")
             }
         }
     }

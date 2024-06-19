@@ -6,13 +6,13 @@ pub enum FromStrError {}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImageName {
-    pub(super) registry: Registry,
-    pub(super) repository: String,
-    pub(super) image_name: String,
-    pub(super) identifier: Either<Tag, Digest>,
+    pub registry: Registry,
+    pub repository: String,
+    pub image_name: String,
+    pub identifier: Either<Tag, Digest>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Registry {
     DockerHub,
     Github,
@@ -47,7 +47,7 @@ impl std::str::FromStr for ImageName {
 
         let registry = if components.len() == 3 {
             match *components.first().expect("already checked the length") {
-                "docker.io" => Registry::DockerHub,
+                "docker.io" | "index.docker.io" => Registry::DockerHub,
                 "ghcr.io" => Registry::Github,
                 "quay.io" => Registry::Quay,
                 _ => Registry::Specific(components[0].to_string()),
@@ -93,11 +93,13 @@ impl std::str::FromStr for ImageName {
 }
 
 impl Registry {
-    pub(super) fn registry_domain(&self) -> &str {
+    #[must_use]
+    pub fn registry_domain(&self) -> &str {
         match self {
             Self::DockerHub => "index.docker.io",
             Self::Github => "ghcr.io",
             Self::Quay => "quay.io",
+
             Self::Specific(s) => s,
         }
     }

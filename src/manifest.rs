@@ -16,7 +16,7 @@ use serde::{
 };
 use url::Url;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum Manifest {
     Image(Image),
@@ -24,7 +24,7 @@ pub enum Manifest {
     Single(Single),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Image {
     #[serde(rename = "schemaVersion")]
     pub schema_version: SchemaVersion,
@@ -37,7 +37,7 @@ pub struct Image {
     pub layers: Vec<Layer>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct List {
     #[serde(rename = "schemaVersion")]
     schema_version: SchemaVersion,
@@ -48,7 +48,7 @@ pub struct List {
     pub manifests: Vec<Entry>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Single {
     #[serde(rename = "schemaVersion")]
     pub schema_version: SchemaVersion,
@@ -63,13 +63,13 @@ pub struct Single {
     pub history: Vec<History>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SchemaVersion {
     V1,
     V2,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Entry {
     #[serde(rename = "mediaType")]
     pub media_type: String,
@@ -78,7 +78,7 @@ pub struct Entry {
     pub platform: Platform,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Platform {
     pub architecture: Architecture,
     pub os: OperatingSystem,
@@ -99,7 +99,7 @@ pub struct Platform {
     features: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Architecture {
     #[serde(rename = "386")]
@@ -122,7 +122,7 @@ pub enum Architecture {
     Unknown,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum OperatingSystem {
     Aix,
@@ -144,7 +144,7 @@ pub enum OperatingSystem {
     Unknown,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
     #[serde(rename = "mediaType")]
     pub media_type: String,
@@ -152,7 +152,7 @@ pub struct Config {
     pub digest: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Layer {
     #[serde(rename = "mediaType")]
     pub media_type: String,
@@ -168,13 +168,13 @@ pub struct Layer {
     pub annotations: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FsLayer {
     #[serde(rename = "blobSum")]
     pub blob_sum: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct History {
     #[serde(
         rename = "v1Compatibility",
@@ -183,7 +183,7 @@ pub struct History {
     pub v1_compatibility: V1Compatibility,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct V1Compatibility {
     pub id: String,
     pub created: DateTime<Utc>,
@@ -195,7 +195,7 @@ pub struct V1Compatibility {
     pub container_config: Option<ContainerConfig>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ContainerConfig {
     #[serde(rename = "Hostname")]
     #[serde(skip_serializing_if = "Option::is_none")]

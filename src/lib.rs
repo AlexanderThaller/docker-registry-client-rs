@@ -11,5 +11,6 @@ pub mod manifest;
 pub use docker::{
     Client,
     Error as ClientError,
+    Response,
 };
 pub use manifest::Manifest;
