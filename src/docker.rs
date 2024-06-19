@@ -8,6 +8,10 @@ use reqwest::{
     Client as HTTPClient,
 };
 use tokio::sync::RwLock;
+use tracing::{
+    info_span,
+    Instrument,
+};
 use url::Url;
 
 use crate::{
@@ -53,6 +57,7 @@ impl Client {
     /// Returns an error if the response body is not valid JSON.
     /// Returns an error if the response body is not a valid manifest.
     /// Returns an error if the response status is not successful.
+    #[tracing::instrument]
     pub async fn get_manifest(&self, image_name: &ImageName) -> Result<Response, Error> {
         let mut headers = self.get_headers(image_name).await?;
 
@@ -88,10 +93,12 @@ impl Client {
             .get(url.as_str())
             .headers(headers)
             .send()
+            .instrument(info_span!("get manifest request"))
             .await
             .map_err(Error::GetManifest)?;
 
         let status = response.status();
+
         let digest = response
             .headers()
             .get("Docker-Content-Digest")
@@ -103,7 +110,11 @@ impl Client {
             })
             .transpose()?;
 
-        let body = response.text().await.map_err(Error::ExtractManifestBody)?;
+        let body = response
+            .text()
+            .instrument(info_span!("extract manifest request body"))
+            .await
+            .map_err(Error::ExtractManifestBody)?;
 
         if !status.is_success() {
             if status == reqwest::StatusCode::NOT_FOUND {
@@ -119,6 +130,7 @@ impl Client {
         Ok(Response { digest, manifest })
     }
 
+    #[tracing::instrument]
     async fn get_headers(&self, image_name: &ImageName) -> Result<HeaderMap, Error> {
         #[derive(Debug, serde::Deserialize)]
         struct Token {
@@ -131,7 +143,12 @@ impl Client {
             image_name: image_name.image_name.clone(),
         };
 
-        let token_cache = self.token_cache.read().await;
+        let token_cache = self
+            .token_cache
+            .read()
+            .instrument(info_span!("get token from cache"))
+            .await;
+
         let token = token_cache.get(&cache_key).cloned();
         drop(token_cache);
 
@@ -155,15 +172,24 @@ impl Client {
                 .client
                 .get(token_url)
                 .send()
+                .instrument(info_span!("get token request"))
                 .await
                 .map_err(Error::GetToken)?;
 
-            let body = response.text().await.map_err(Error::ExtractTokenBody)?;
+            let body = response
+                .text()
+                .instrument(info_span!("extract token request body"))
+                .await
+                .map_err(Error::ExtractTokenBody)?;
 
             let token: Token =
                 serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
 
-            let mut token_cache = self.token_cache.write().await;
+            let mut token_cache = self
+                .token_cache
+                .write()
+                .instrument(info_span!("write token to cache"))
+                .await;
             token_cache.insert(cache_key, token.token.clone());
 
             token.token
