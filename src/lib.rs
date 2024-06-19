@@ -10,6 +10,6 @@ pub mod manifest;
 
 pub use docker::{
     Client,
-    Error as DockerError,
+    Error as ClientError,
 };
 pub use manifest::Manifest;
