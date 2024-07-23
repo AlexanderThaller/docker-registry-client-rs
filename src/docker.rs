@@ -7,6 +7,10 @@ use reqwest::{
     header::HeaderMap,
     Client as HTTPClient,
 };
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tokio::sync::RwLock;
 use tracing::{
     info_span,
@@ -40,7 +44,7 @@ struct CacheKey {
     image_name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Response {
     pub digest: Option<String>,
     pub manifest: Manifest,
