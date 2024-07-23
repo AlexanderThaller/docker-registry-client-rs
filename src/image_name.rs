@@ -1,4 +1,8 @@
 use either::Either;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -133,6 +137,27 @@ impl std::fmt::Display for ImageName {
                 Either::Right(digest) => digest.to_string(),
             }
         )
+    }
+}
+
+impl Serialize for ImageName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde::Serialize::serialize(&self.to_string(), serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ImageName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+        let image_name = string.parse().map_err(serde::de::Error::custom)?;
+
+        Ok(image_name)
     }
 }
 
