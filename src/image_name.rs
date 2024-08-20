@@ -11,7 +11,7 @@ pub enum FromStrError {}
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImageName {
     pub registry: Registry,
-    pub repository: String,
+    pub repository: Option<String>,
     pub image_name: String,
     pub identifier: Either<Tag, Digest>,
 }
@@ -21,6 +21,7 @@ pub enum Registry {
     DockerHub,
     Github,
     Quay,
+    RedHat,
 
     Specific(String),
 }
@@ -89,7 +90,7 @@ impl std::str::FromStr for ImageName {
 
         Ok(Self {
             registry,
-            repository,
+            repository: Some(repository),
             image_name,
             identifier,
         })
@@ -128,11 +129,14 @@ impl std::fmt::Display for ImageName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}/{}/{}:{}",
-            self.registry.registry_domain(),
-            self.repository,
-            self.image_name,
-            match &self.identifier {
+            "{registry}/{repository}{image_name}:{identifier}",
+            registry = self.registry.registry_domain(),
+            repository = match self.repository {
+                Some(ref repository) => format!("{repository}/"),
+                None => String::new(),
+            },
+            image_name = self.image_name,
+            identifier = match &self.identifier {
                 Either::Left(tag) => tag.to_string(),
                 Either::Right(digest) => digest.to_string(),
             }
@@ -178,7 +182,7 @@ mod tests {
         fn full_tag() {
             let expected = ImageName {
                 registry: Registry::Github,
-                repository: "aquasecurity".to_string(),
+                repository: Some("aquasecurity".to_string()),
                 image_name: "trivy".to_string(),
                 identifier: Either::Left(Tag::Specific("0.52.0".to_string())),
             };
@@ -191,7 +195,7 @@ mod tests {
 
             let expected = ImageName {
                 registry: Registry::Quay,
-                repository: "openshift-community-operators".to_string(),
+                repository: Some("openshift-community-operators".to_string()),
                 image_name: "external-secrets-operator".to_string(),
                 identifier: Either::Left(Tag::Specific("v0.9.9".to_string())),
             };
@@ -207,7 +211,7 @@ mod tests {
         fn just_name() {
             let expected = ImageName {
                 registry: Registry::DockerHub,
-                repository: "library".to_string(),
+                repository: Some("library".to_string()),
                 image_name: "archlinux".to_string(),
                 identifier: Either::Left(Tag::Latest),
             };
@@ -221,7 +225,7 @@ mod tests {
         fn digest() {
             let expected = ImageName {
                 registry: Registry::Quay,
-                repository: "openshift-community-operators".to_string(),
+                repository: Some("openshift-community-operators".to_string()),
                 image_name: "external-secrets-operator".to_string(),
                 identifier: Either::Right(Digest(
                     "sha256:2247f14d217577b451727b3015f95e97d47941e96b99806f8589a34c43112ec3"

@@ -13,4 +13,9 @@ pub use docker::{
     Error as ClientError,
     Response,
 };
+pub use image_name::{
+    ImageName,
+    Registry,
+    Tag,
+};
 pub use manifest::Manifest;
