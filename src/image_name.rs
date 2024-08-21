@@ -5,8 +5,9 @@ use serde::{
 };
 
 #[derive(Debug)]
-#[non_exhaustive]
-pub enum FromStrError {}
+pub enum FromStrError {
+    MissingFirstComponent,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImageName {
@@ -50,21 +51,30 @@ impl std::str::FromStr for ImageName {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let components = s.split('/').collect::<Vec<_>>();
 
-        let registry = if components.len() == 3 {
-            match *components.first().expect("already checked the length") {
+        // Special case when images do not specify a registry we default to DockerHub
+        let registry = if components.len() == 1 {
+            Registry::DockerHub
+        } else {
+            let registry = components.first().ok_or(Self::Err::MissingFirstComponent)?;
+
+            match *registry {
                 "docker.io" | "index.docker.io" => Registry::DockerHub,
                 "ghcr.io" => Registry::Github,
                 "quay.io" => Registry::Quay,
-                _ => Registry::Specific(components[0].to_string()),
+                "registry.access.redhat.com" => Registry::RedHat,
+
+                _ => Registry::Specific((*registry).to_string()),
             }
-        } else {
-            Registry::DockerHub
         };
 
+        // Special case when images do not specify a registry we default to DockerHub
+        // library repository
         let repository = if components.len() == 1 {
-            "library".to_string()
+            Some("library".to_string())
+        } else if components.len() == 2 {
+            None
         } else {
-            components[components.len() - 2].to_string()
+            Some(components[1].to_string())
         };
 
         let tag_or_digest = components[components.len() - 1];
@@ -90,7 +100,7 @@ impl std::str::FromStr for ImageName {
 
         Ok(Self {
             registry,
-            repository: Some(repository),
+            repository,
             image_name,
             identifier,
         })
@@ -246,6 +256,22 @@ mod tests {
                        2247f14d217577b451727b3015f95e97d47941e96b99806f8589a34c43112ec3"
                 .parse::<ImageName>()
                 .unwrap();
+
+            assert_eq!(expected, got);
+        }
+
+        #[test]
+        fn from_str_redhat() {
+            const INPUT: &str = "registry.access.redhat.com/ubi8:8.9";
+
+            let expected = ImageName {
+                registry: Registry::RedHat,
+                repository: None,
+                image_name: "ubi8".to_string(),
+                identifier: Either::Left(Tag::Specific("8.9".to_string())),
+            };
+
+            let got = INPUT.parse::<ImageName>().unwrap();
 
             assert_eq!(expected, got);
         }
