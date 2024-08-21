@@ -40,7 +40,7 @@ pub struct Client {
 #[derive(Debug, Eq, PartialEq, Hash)]
 struct CacheKey {
     registry: Registry,
-    repository: String,
+    repository: Option<String>,
     image_name: String,
 }
 
@@ -87,8 +87,14 @@ impl Client {
         let registry_domain = image_name.registry.registry_domain();
 
         let url = Url::parse(&format!(
-            "https://{}/v2/{}/{}/manifests/{}",
-            registry_domain, image_name.repository, image_name.image_name, image_name.identifier
+            "https://{domain}/v2/{repository}{image_name}/manifests/{identifier}",
+            domain = registry_domain,
+            repository = match image_name.repository {
+                Some(ref repository) => format!("{repository}/"),
+                None => String::new(),
+            },
+            image_name = image_name.image_name,
+            identifier = image_name.identifier
         ))
         .map_err(Error::InvalidManifestUrl)?;
 
@@ -141,6 +147,10 @@ impl Client {
             token: String,
         }
 
+        if !image_name.registry.needs_authentication() {
+            return Ok(HeaderMap::new());
+        }
+
         let cache_key = CacheKey {
             registry: image_name.registry.clone(),
             repository: image_name.repository.clone(),
@@ -159,15 +169,22 @@ impl Client {
         let token = if let Some(token) = token {
             token
         } else {
+            let repository = match &image_name.repository {
+                Some(repository) => format!("{repository}/"),
+                None => String::new(),
+            };
+
             let token_url = match image_name.registry {
                 Registry::Github => format!(
-                    "https://ghcr.io/token?scope=repository:{}/{}:pull&service=ghcr.io",
-                    image_name.repository, image_name.image_name
+                    "https://ghcr.io/token?scope=repository:{repository}{image_name}:pull&service=ghcr.io",
+                    image_name = image_name.image_name
                 ),
-                Registry::DockerHub => format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:{}/{}:pull&service=registry.docker.io", image_name.repository, image_name.image_name),
-                Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{}/{}:pull&service=quay.io", image_name.repository, image_name.image_name),
 
-                Registry::Specific(_) => return Ok(HeaderMap::new()),
+                Registry::DockerHub => format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repository}{image_name}:pull&service=registry.docker.io", image_name = image_name.image_name),
+
+                Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{repository}{image_name}:pull&service=quay.io", image_name = image_name.image_name),
+
+                Registry::RedHat | Registry::Specific(_) => return Ok(HeaderMap::new()),
             };
 
             let token_url = Url::parse(&token_url).map_err(Error::InvalidTokenUrl)?;
@@ -208,5 +225,48 @@ impl Client {
         );
 
         Ok(headers)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Client,
+        ImageName,
+        Registry,
+        Tag,
+    };
+    use either::Either;
+
+    #[tokio::test]
+    async fn get_manifest_dockerhub() {
+        let client = Client::new();
+
+        let image_name = ImageName {
+            registry: Registry::DockerHub,
+            repository: Some("library".to_string()),
+            image_name: "alpine".to_string(),
+            identifier: Either::Left(Tag::Specific("3.20".to_string())),
+        };
+
+        let response = client.get_manifest(&image_name).await.unwrap();
+
+        insta::assert_json_snapshot!(response);
+    }
+
+    #[tokio::test]
+    async fn get_manifest_redhat() {
+        let client = Client::new();
+
+        let image_name = ImageName {
+            registry: Registry::RedHat,
+            repository: None,
+            image_name: "ubi8".to_string(),
+            identifier: Either::Left(Tag::Specific("8.9".to_string())),
+        };
+
+        let response = client.get_manifest(&image_name).await.unwrap();
+
+        insta::assert_json_snapshot!(response);
     }
 }

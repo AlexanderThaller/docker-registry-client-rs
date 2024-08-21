@@ -5,13 +5,14 @@ use serde::{
 };
 
 #[derive(Debug)]
-#[non_exhaustive]
-pub enum FromStrError {}
+pub enum FromStrError {
+    MissingFirstComponent,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImageName {
     pub registry: Registry,
-    pub repository: String,
+    pub repository: Option<String>,
     pub image_name: String,
     pub identifier: Either<Tag, Digest>,
 }
@@ -21,6 +22,7 @@ pub enum Registry {
     DockerHub,
     Github,
     Quay,
+    RedHat,
 
     Specific(String),
 }
@@ -49,21 +51,30 @@ impl std::str::FromStr for ImageName {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let components = s.split('/').collect::<Vec<_>>();
 
-        let registry = if components.len() == 3 {
-            match *components.first().expect("already checked the length") {
+        // Special case when images do not specify a registry we default to DockerHub
+        let registry = if components.len() == 1 {
+            Registry::DockerHub
+        } else {
+            let registry = components.first().ok_or(Self::Err::MissingFirstComponent)?;
+
+            match *registry {
                 "docker.io" | "index.docker.io" => Registry::DockerHub,
                 "ghcr.io" => Registry::Github,
                 "quay.io" => Registry::Quay,
-                _ => Registry::Specific(components[0].to_string()),
+                "registry.access.redhat.com" => Registry::RedHat,
+
+                _ => Registry::Specific((*registry).to_string()),
             }
-        } else {
-            Registry::DockerHub
         };
 
+        // Special case when images do not specify a registry we default to DockerHub
+        // library repository
         let repository = if components.len() == 1 {
-            "library".to_string()
+            Some("library".to_string())
+        } else if components.len() == 2 {
+            None
         } else {
-            components[components.len() - 2].to_string()
+            Some(components[1].to_string())
         };
 
         let tag_or_digest = components[components.len() - 1];
@@ -103,8 +114,17 @@ impl Registry {
             Self::DockerHub => "index.docker.io",
             Self::Github => "ghcr.io",
             Self::Quay => "quay.io",
+            Self::RedHat => "registry.access.redhat.com",
 
             Self::Specific(s) => s,
+        }
+    }
+
+    #[must_use]
+    pub fn needs_authentication(&self) -> bool {
+        match self {
+            Self::DockerHub | Self::Github | Self::Quay => true,
+            Self::RedHat | Self::Specific(_) => false,
         }
     }
 }
@@ -128,11 +148,14 @@ impl std::fmt::Display for ImageName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}/{}/{}:{}",
-            self.registry.registry_domain(),
-            self.repository,
-            self.image_name,
-            match &self.identifier {
+            "{registry}/{repository}{image_name}:{identifier}",
+            registry = self.registry.registry_domain(),
+            repository = match self.repository {
+                Some(ref repository) => format!("{repository}/"),
+                None => String::new(),
+            },
+            image_name = self.image_name,
+            identifier = match &self.identifier {
                 Either::Left(tag) => tag.to_string(),
                 Either::Right(digest) => digest.to_string(),
             }
@@ -178,7 +201,7 @@ mod tests {
         fn full_tag() {
             let expected = ImageName {
                 registry: Registry::Github,
-                repository: "aquasecurity".to_string(),
+                repository: Some("aquasecurity".to_string()),
                 image_name: "trivy".to_string(),
                 identifier: Either::Left(Tag::Specific("0.52.0".to_string())),
             };
@@ -191,7 +214,7 @@ mod tests {
 
             let expected = ImageName {
                 registry: Registry::Quay,
-                repository: "openshift-community-operators".to_string(),
+                repository: Some("openshift-community-operators".to_string()),
                 image_name: "external-secrets-operator".to_string(),
                 identifier: Either::Left(Tag::Specific("v0.9.9".to_string())),
             };
@@ -207,7 +230,7 @@ mod tests {
         fn just_name() {
             let expected = ImageName {
                 registry: Registry::DockerHub,
-                repository: "library".to_string(),
+                repository: Some("library".to_string()),
                 image_name: "archlinux".to_string(),
                 identifier: Either::Left(Tag::Latest),
             };
@@ -221,7 +244,7 @@ mod tests {
         fn digest() {
             let expected = ImageName {
                 registry: Registry::Quay,
-                repository: "openshift-community-operators".to_string(),
+                repository: Some("openshift-community-operators".to_string()),
                 image_name: "external-secrets-operator".to_string(),
                 identifier: Either::Right(Digest(
                     "sha256:2247f14d217577b451727b3015f95e97d47941e96b99806f8589a34c43112ec3"
@@ -233,6 +256,22 @@ mod tests {
                        2247f14d217577b451727b3015f95e97d47941e96b99806f8589a34c43112ec3"
                 .parse::<ImageName>()
                 .unwrap();
+
+            assert_eq!(expected, got);
+        }
+
+        #[test]
+        fn from_str_redhat() {
+            const INPUT: &str = "registry.access.redhat.com/ubi8:8.9";
+
+            let expected = ImageName {
+                registry: Registry::RedHat,
+                repository: None,
+                image_name: "ubi8".to_string(),
+                identifier: Either::Left(Tag::Specific("8.9".to_string())),
+            };
+
+            let got = INPUT.parse::<ImageName>().unwrap();
 
             assert_eq!(expected, got);
         }
