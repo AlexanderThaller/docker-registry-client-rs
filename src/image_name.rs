@@ -104,8 +104,17 @@ impl Registry {
             Self::DockerHub => "index.docker.io",
             Self::Github => "ghcr.io",
             Self::Quay => "quay.io",
+            Self::RedHat => "registry.access.redhat.com",
 
             Self::Specific(s) => s,
+        }
+    }
+
+    #[must_use]
+    pub fn needs_authentication(&self) -> bool {
+        match self {
+            Self::DockerHub | Self::Github | Self::Quay => true,
+            Self::RedHat | Self::Specific(_) => false,
         }
     }
 }

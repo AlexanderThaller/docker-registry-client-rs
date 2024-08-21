@@ -147,6 +147,10 @@ impl Client {
             token: String,
         }
 
+        if !image_name.registry.needs_authentication() {
+            return Ok(HeaderMap::new());
+        }
+
         let cache_key = CacheKey {
             registry: image_name.registry.clone(),
             repository: image_name.repository.clone(),
@@ -180,7 +184,7 @@ impl Client {
 
                 Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{repository}{image_name}:pull&service=quay.io", image_name = image_name.image_name),
 
-                Registry::Specific(_) => return Ok(HeaderMap::new()),
+                Registry::RedHat | Registry::Specific(_) => return Ok(HeaderMap::new()),
             };
 
             let token_url = Url::parse(&token_url).map_err(Error::InvalidTokenUrl)?;
@@ -255,7 +259,7 @@ mod tests {
         let client = Client::new();
 
         let image_name = ImageName {
-            registry: Registry::DockerHub,
+            registry: Registry::RedHat,
             repository: None,
             image_name: "ubi8".to_string(),
             identifier: Either::Left(Tag::Specific("8.9".to_string())),
