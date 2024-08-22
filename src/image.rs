@@ -329,5 +329,35 @@ mod tests {
                 assert_eq!(expected, got);
             }
         }
+
+        mod k8s {
+            use either::Either;
+            use pretty_assertions::assert_eq;
+
+            use crate::{
+                Image,
+                ImageName,
+                Registry,
+                Tag,
+            };
+
+            #[test]
+            fn vpa() {
+                const INPUT: &str = "registry.k8s.io/autoscaling/vpa-recommender:1.1.2";
+
+                let expected = Image {
+                    registry: Registry::K8s,
+                    repository: Some("autoscaling".to_string()),
+                    image_name: ImageName {
+                        name: "vpa-recommender".to_string(),
+                        identifier: Either::Left(Tag::Specific("1.1.2".to_string())),
+                    },
+                };
+
+                let got = INPUT.parse::<Image>().unwrap();
+
+                assert_eq!(expected, got);
+            }
+        }
     }
 }

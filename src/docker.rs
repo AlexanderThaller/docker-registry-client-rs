@@ -184,7 +184,7 @@ impl Client {
 
                 Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{repository}{image_name}:pull&service=quay.io", image_name = image_name.image_name.name),
 
-                Registry::RedHat => return Ok(HeaderMap::new()),
+                Registry::RedHat | Registry::K8s => return Ok(HeaderMap::new()),
             };
 
             let token_url = Url::parse(&token_url).map_err(Error::InvalidTokenUrl)?;

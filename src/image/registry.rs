@@ -9,6 +9,7 @@ pub enum Registry {
     Github,
     Quay,
     RedHat,
+    K8s,
 }
 
 impl std::fmt::Display for FromStrError {
@@ -28,6 +29,7 @@ impl std::str::FromStr for Registry {
             "ghcr.io" => Ok(Registry::Github),
             "quay.io" => Ok(Registry::Quay),
             "registry.access.redhat.com" => Ok(Registry::RedHat),
+            "registry.k8s.io" => Ok(Registry::K8s),
 
             _ => Err(FromStrError::UnkownRegistry(s.to_string())),
         }
@@ -42,6 +44,7 @@ impl Registry {
             Self::Github => "ghcr.io",
             Self::Quay => "quay.io",
             Self::RedHat => "registry.access.redhat.com",
+            Self::K8s => "registry.k8s.io",
         }
     }
 
@@ -49,7 +52,7 @@ impl Registry {
     pub fn needs_authentication(&self) -> bool {
         match self {
             Self::DockerHub | Self::Github | Self::Quay => true,
-            Self::RedHat => false,
+            Self::RedHat | Self::K8s => false,
         }
     }
 }
