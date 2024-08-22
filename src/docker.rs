@@ -19,11 +19,9 @@ use tracing::{
 use url::Url;
 
 use crate::{
-    image_name::{
-        ImageName,
-        Registry,
-    },
-    manifest::Manifest,
+    Image,
+    Manifest,
+    Registry,
 };
 
 mod error;
@@ -62,8 +60,8 @@ impl Client {
     /// Returns an error if the response body is not a valid manifest.
     /// Returns an error if the response status is not successful.
     #[tracing::instrument]
-    pub async fn get_manifest(&self, image_name: &ImageName) -> Result<Response, Error> {
-        let mut headers = self.get_headers(image_name).await?;
+    pub async fn get_manifest(&self, image: &Image) -> Result<Response, Error> {
+        let mut headers = self.get_headers(image).await?;
 
         let accept_header = [
             "application/vnd.docker.container.image.v1+json",
@@ -84,19 +82,21 @@ impl Client {
                 .map_err(Error::ParseManifestAcceptHeader)?,
         );
 
-        let registry_domain = image_name.registry.registry_domain();
+        let registry_domain = image.registry.registry_domain();
 
         let url = Url::parse(&format!(
             "https://{domain}/v2/{repository}{image_name}/manifests/{identifier}",
             domain = registry_domain,
-            repository = match image_name.repository {
+            repository = match image.repository {
                 Some(ref repository) => format!("{repository}/"),
                 None => String::new(),
             },
-            image_name = image_name.image_name,
-            identifier = image_name.identifier
+            image_name = image.image_name.name,
+            identifier = image.image_name.identifier
         ))
         .map_err(Error::InvalidManifestUrl)?;
+
+        println!("{url}");
 
         let response = self
             .client
@@ -141,7 +141,7 @@ impl Client {
     }
 
     #[tracing::instrument]
-    async fn get_headers(&self, image_name: &ImageName) -> Result<HeaderMap, Error> {
+    async fn get_headers(&self, image_name: &Image) -> Result<HeaderMap, Error> {
         #[derive(Debug, serde::Deserialize)]
         struct Token {
             token: String,
@@ -154,7 +154,7 @@ impl Client {
         let cache_key = CacheKey {
             registry: image_name.registry.clone(),
             repository: image_name.repository.clone(),
-            image_name: image_name.image_name.clone(),
+            image_name: image_name.image_name.to_string(),
         };
 
         let token_cache = self
@@ -177,17 +177,19 @@ impl Client {
             let token_url = match image_name.registry {
                 Registry::Github => format!(
                     "https://ghcr.io/token?scope=repository:{repository}{image_name}:pull&service=ghcr.io",
-                    image_name = image_name.image_name
+                    image_name = image_name.image_name.name
                 ),
 
-                Registry::DockerHub => format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repository}{image_name}:pull&service=registry.docker.io", image_name = image_name.image_name),
+                Registry::DockerHub => format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repository}{image_name}:pull&service=registry.docker.io", image_name = image_name.image_name.name),
 
-                Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{repository}{image_name}:pull&service=quay.io", image_name = image_name.image_name),
+                Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{repository}{image_name}:pull&service=quay.io", image_name = image_name.image_name.name),
 
-                Registry::RedHat | Registry::Specific(_) => return Ok(HeaderMap::new()),
+                Registry::RedHat => return Ok(HeaderMap::new()),
             };
 
             let token_url = Url::parse(&token_url).map_err(Error::InvalidTokenUrl)?;
+
+            println!("{token_url}");
 
             let response = self
                 .client
@@ -230,43 +232,61 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Client,
-        ImageName,
-        Registry,
-        Tag,
-    };
-    use either::Either;
-
-    #[tokio::test]
-    async fn get_manifest_dockerhub() {
-        let client = Client::new();
-
-        let image_name = ImageName {
-            registry: Registry::DockerHub,
-            repository: Some("library".to_string()),
-            image_name: "alpine".to_string(),
-            identifier: Either::Left(Tag::Specific("3.20".to_string())),
+    mod dockerhub {
+        use crate::{
+            Client,
+            Image,
+            ImageName,
+            Registry,
+            Tag,
         };
+        use either::Either;
 
-        let response = client.get_manifest(&image_name).await.unwrap();
+        #[tokio::test]
+        async fn alpine() {
+            let client = Client::new();
 
-        insta::assert_json_snapshot!(response);
+            let image_name = Image {
+                registry: Registry::DockerHub,
+                repository: Some("library".to_string()),
+                image_name: ImageName {
+                    name: "alpine".to_string(),
+                    identifier: Either::Left(Tag::Specific("3.20".to_string())),
+                },
+            };
+
+            let response = client.get_manifest(&image_name).await.unwrap();
+
+            insta::assert_json_snapshot!(response);
+        }
     }
 
-    #[tokio::test]
-    async fn get_manifest_redhat() {
-        let client = Client::new();
-
-        let image_name = ImageName {
-            registry: Registry::RedHat,
-            repository: None,
-            image_name: "ubi8".to_string(),
-            identifier: Either::Left(Tag::Specific("8.9".to_string())),
+    mod redhat {
+        use crate::{
+            Client,
+            Image,
+            ImageName,
+            Registry,
+            Tag,
         };
+        use either::Either;
 
-        let response = client.get_manifest(&image_name).await.unwrap();
+        #[tokio::test]
+        async fn ubi8() {
+            let client = Client::new();
 
-        insta::assert_json_snapshot!(response);
+            let image_name = Image {
+                registry: Registry::RedHat,
+                repository: None,
+                image_name: ImageName {
+                    name: "ubi8".to_string(),
+                    identifier: Either::Left(Tag::Specific("8.9".to_string())),
+                },
+            };
+
+            let response = client.get_manifest(&image_name).await.unwrap();
+
+            insta::assert_json_snapshot!(response);
+        }
     }
 }

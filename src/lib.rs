@@ -6,7 +6,7 @@
 #![warn(clippy::dbg_macro)]
 
 pub mod docker;
-pub mod image_name;
+pub mod image;
 pub mod manifest;
 
 pub use docker::{
@@ -14,9 +14,13 @@ pub use docker::{
     Error as ClientError,
     Response,
 };
-pub use image_name::{
-    ImageName,
-    Registry,
-    Tag,
+pub use image::{
+    image_name::{
+        digest::Digest,
+        tag::Tag,
+        ImageName,
+    },
+    registry::Registry,
+    Image,
 };
 pub use manifest::Manifest;
