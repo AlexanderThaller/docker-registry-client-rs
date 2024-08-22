@@ -96,8 +96,6 @@ impl Client {
         ))
         .map_err(Error::InvalidManifestUrl)?;
 
-        println!("{url}");
-
         let response = self
             .client
             .get(url.as_str())
@@ -188,8 +186,6 @@ impl Client {
             };
 
             let token_url = Url::parse(&token_url).map_err(Error::InvalidTokenUrl)?;
-
-            println!("{token_url}");
 
             let response = self
                 .client
