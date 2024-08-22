@@ -37,9 +37,7 @@ pub struct Client {
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 struct CacheKey {
-    registry: Registry,
-    repository: Option<String>,
-    image_name: String,
+    url: Url,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,14 +52,9 @@ impl Client {
         Self::default()
     }
 
-    /// # Errors
-    /// Returns an error if the request fails.
-    /// Returns an error if the response body is not valid JSON.
-    /// Returns an error if the response body is not a valid manifest.
-    /// Returns an error if the response status is not successful.
     #[tracing::instrument]
-    pub async fn get_manifest(&self, image: &Image) -> Result<Response, Error> {
-        let mut headers = self.get_headers(image).await?;
+    pub async fn get_manifest_url(&self, url: &Url, image: &Image) -> Result<Response, Error> {
+        let mut headers = self.get_headers(url, image).await?;
 
         let accept_header = [
             "application/vnd.docker.container.image.v1+json",
@@ -81,20 +74,6 @@ impl Client {
                 .parse()
                 .map_err(Error::ParseManifestAcceptHeader)?,
         );
-
-        let registry_domain = image.registry.registry_domain();
-
-        let url = Url::parse(&format!(
-            "https://{domain}/v2/{repository}{image_name}/manifests/{identifier}",
-            domain = registry_domain,
-            repository = match image.repository {
-                Some(ref repository) => format!("{repository}/"),
-                None => String::new(),
-            },
-            image_name = image.image_name.name,
-            identifier = image.image_name.identifier
-        ))
-        .map_err(Error::InvalidManifestUrl)?;
 
         let response = self
             .client
@@ -126,7 +105,7 @@ impl Client {
 
         if !status.is_success() {
             if status == reqwest::StatusCode::NOT_FOUND {
-                return Err(Error::ManifestNotFound(url));
+                return Err(Error::ManifestNotFound(url.clone()));
             }
 
             return Err(Error::FailedManifestRequest(status, body));
@@ -138,22 +117,46 @@ impl Client {
         Ok(Response { digest, manifest })
     }
 
+    /// # Errors
+    /// Returns an error if the request fails.
+    /// Returns an error if the response body is not valid JSON.
+    /// Returns an error if the response body is not a valid manifest.
+    /// Returns an error if the response status is not successful.
     #[tracing::instrument]
-    async fn get_headers(&self, image_name: &Image) -> Result<HeaderMap, Error> {
+    pub async fn get_manifest(&self, image: &Image) -> Result<Response, Error> {
+        let registry_domain = image.registry.registry_domain();
+
+        let url = Url::parse(&format!(
+            "https://{domain}/v2/{namespace}{repository}{image_name}/manifests/{identifier}",
+            domain = registry_domain,
+            namespace = match image.namespace {
+                Some(ref namespace) => format!("{namespace}/"),
+                None => String::new(),
+            },
+            repository = match image.repository {
+                Some(ref repository) => format!("{repository}/"),
+                None => String::new(),
+            },
+            image_name = image.image_name.name,
+            identifier = image.image_name.identifier
+        ))
+        .map_err(Error::InvalidManifestUrl)?;
+
+        self.get_manifest_url(&url, &image).await
+    }
+
+    #[tracing::instrument]
+    async fn get_headers(&self, url: &Url, image: &Image) -> Result<HeaderMap, Error> {
         #[derive(Debug, serde::Deserialize)]
         struct Token {
             token: String,
         }
 
-        if !image_name.registry.needs_authentication() {
+        if !image.registry.needs_authentication() {
             return Ok(HeaderMap::new());
         }
 
-        let cache_key = CacheKey {
-            registry: image_name.registry.clone(),
-            repository: image_name.repository.clone(),
-            image_name: image_name.image_name.to_string(),
-        };
+        let cache_key = CacheKey { url: url.clone() };
 
         let token_cache = self
             .token_cache
@@ -167,20 +170,25 @@ impl Client {
         let token = if let Some(token) = token {
             token
         } else {
-            let repository = match &image_name.repository {
+            let namespace = match &image.namespace {
+                Some(namespace) => format!("{namespace}/"),
+                None => String::new(),
+            };
+
+            let repository = match &image.repository {
                 Some(repository) => format!("{repository}/"),
                 None => String::new(),
             };
 
-            let token_url = match image_name.registry {
+            let token_url = match image.registry {
                 Registry::Github => format!(
-                    "https://ghcr.io/token?scope=repository:{repository}{image_name}:pull&service=ghcr.io",
-                    image_name = image_name.image_name.name
+                    "https://ghcr.io/token?scope=repository:{namespace}{repository}{image_name}:pull&service=ghcr.io",
+                    image_name = image.image_name.name
                 ),
 
-                Registry::DockerHub => format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repository}{image_name}:pull&service=registry.docker.io", image_name = image_name.image_name.name),
+                Registry::DockerHub => format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:{namespace}{repository}{image_name}:pull&service=registry.docker.io", image_name = image.image_name.name),
 
-                Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{repository}{image_name}:pull&service=quay.io", image_name = image_name.image_name.name),
+                Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{namespace}{repository}{image_name}:pull&service=quay.io", image_name = image.image_name.name),
 
                 Registry::RedHat | Registry::K8s => return Ok(HeaderMap::new()),
             };
@@ -244,6 +252,7 @@ mod tests {
 
             let image_name = Image {
                 registry: Registry::DockerHub,
+                namespace: None,
                 repository: Some("library".to_string()),
                 image_name: ImageName {
                     name: "alpine".to_string(),
@@ -271,8 +280,9 @@ mod tests {
         async fn ubi8() {
             let client = Client::new();
 
-            let image_name = Image {
+            let image = Image {
                 registry: Registry::RedHat,
+                namespace: None,
                 repository: None,
                 image_name: ImageName {
                     name: "ubi8".to_string(),
@@ -280,7 +290,17 @@ mod tests {
                 },
             };
 
-            let response = client.get_manifest(&image_name).await.unwrap();
+            let response = client.get_manifest(&image).await.unwrap();
+
+            insta::assert_json_snapshot!(response);
+        }
+
+        #[tokio::test]
+        async fn cosign() {
+            let client = Client::new();
+            const INPUT: &str = "ghcr.io/sigstore/cosign/cosign:v2.4.0";
+            let image = INPUT.parse().unwrap();
+            let response = client.get_manifest(&image).await.unwrap();
 
             insta::assert_json_snapshot!(response);
         }

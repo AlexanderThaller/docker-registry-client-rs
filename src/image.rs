@@ -22,9 +22,13 @@ pub enum FromStrError {
     MissingRepository,
 }
 
+#[derive(Debug)]
+pub enum FromUrlError {}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Image {
     pub registry: Registry,
+    pub namespace: Option<String>,
     pub repository: Option<String>,
     pub image_name: ImageName,
 }
@@ -42,6 +46,14 @@ impl std::fmt::Display for FromStrError {
 }
 
 impl std::error::Error for FromStrError {}
+
+impl std::fmt::Display for FromUrlError {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for FromUrlError {}
 
 impl std::str::FromStr for Image {
     type Err = FromStrError;
@@ -63,6 +75,7 @@ impl std::str::FromStr for Image {
 
                 Ok(Image {
                     registry: Registry::DockerHub,
+                    namespace: None,
                     repository: Some("library".to_string()),
                     image_name,
                 })
@@ -91,6 +104,7 @@ impl std::str::FromStr for Image {
 
                         Ok(Image {
                             registry: Registry::DockerHub,
+                            namespace: None,
                             repository: Some(repository),
                             image_name,
                         })
@@ -105,6 +119,7 @@ impl std::str::FromStr for Image {
 
                         Ok(Image {
                             registry,
+                            namespace: None,
                             repository: None,
                             image_name,
                         })
@@ -133,6 +148,39 @@ impl std::str::FromStr for Image {
 
                 Ok(Image {
                     registry,
+                    namespace: None,
+                    repository: Some(repository),
+                    image_name,
+                })
+            }
+
+            // Case where we have a registry, a repository and a docker image name and a namespace
+            4 => {
+                let registry = components
+                    .first()
+                    .expect("should never fail as we have 4 components")
+                    .parse()
+                    .map_err(Self::Err::ParseRegistry)?;
+
+                let namespace = (*components
+                    .get(1)
+                    .expect("should never fail as we have 4 components"))
+                .to_string();
+
+                let repository = (*components
+                    .get(2)
+                    .expect("should never fail as we have 4 components"))
+                .to_string();
+
+                let image_name = components
+                    .get(3)
+                    .expect("should never fail as we have 4 components")
+                    .parse()
+                    .map_err(Self::Err::ParseImageName)?;
+
+                Ok(Image {
+                    registry,
+                    namespace: Some(namespace),
                     repository: Some(repository),
                     image_name,
                 })
@@ -153,8 +201,12 @@ impl std::fmt::Display for Image {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{registry}/{repository}{image_name}",
+            "{registry}/{namespace}{repository}{image_name}",
             registry = self.registry.registry_domain(),
+            namespace = match self.namespace {
+                Some(ref namespace) => format!("{namespace}/"),
+                None => String::new(),
+            },
             repository = match self.repository {
                 Some(ref repository) => format!("{repository}/"),
                 None => String::new(),
@@ -202,6 +254,7 @@ mod tests {
         fn full_tag() {
             let expected = Image {
                 registry: Registry::Github,
+                namespace: None,
                 repository: Some("aquasecurity".to_string()),
                 image_name: ImageName {
                     name: "trivy".to_string(),
@@ -217,6 +270,7 @@ mod tests {
 
             let expected = Image {
                 registry: Registry::Quay,
+                namespace: None,
                 repository: Some("openshift-community-operators".to_string()),
                 image_name: ImageName {
                     name: "external-secrets-operator".to_string(),
@@ -235,6 +289,7 @@ mod tests {
         fn just_name() {
             let expected = Image {
                 registry: Registry::DockerHub,
+                namespace: None,
                 repository: Some("library".to_string()),
                 image_name: ImageName {
                     name: "archlinux".to_string(),
@@ -251,6 +306,7 @@ mod tests {
         fn digest() {
             let expected = Image {
                 registry: Registry::Quay,
+                namespace: None,
                 repository: Some("openshift-community-operators".to_string()),
                 image_name: ImageName {
                     name: "external-secrets-operator".to_string(),
@@ -287,6 +343,7 @@ mod tests {
 
                 let expected = Image {
                     registry: Registry::DockerHub,
+                    namespace: None,
                     repository: Some("prom".to_string()),
                     image_name: ImageName {
                         name: "prometheus".to_string(),
@@ -317,6 +374,7 @@ mod tests {
 
                 let expected = Image {
                     registry: Registry::RedHat,
+                    namespace: None,
                     repository: None,
                     image_name: ImageName {
                         name: "ubi8".to_string(),
@@ -347,10 +405,42 @@ mod tests {
 
                 let expected = Image {
                     registry: Registry::K8s,
+                    namespace: None,
                     repository: Some("autoscaling".to_string()),
                     image_name: ImageName {
                         name: "vpa-recommender".to_string(),
                         identifier: Either::Left(Tag::Specific("1.1.2".to_string())),
+                    },
+                };
+
+                let got = INPUT.parse::<Image>().unwrap();
+
+                assert_eq!(expected, got);
+            }
+        }
+
+        mod github {
+            use either::Either;
+            use pretty_assertions::assert_eq;
+
+            use crate::{
+                Image,
+                ImageName,
+                Registry,
+                Tag,
+            };
+
+            #[test]
+            fn cosign() {
+                const INPUT: &str = "ghcr.io/sigstore/cosign/cosign:v2.4.0";
+
+                let expected = Image {
+                    registry: Registry::Github,
+                    namespace: Some("sigstore".to_string()),
+                    repository: Some("cosign".to_string()),
+                    image_name: ImageName {
+                        name: "cosign".to_string(),
+                        identifier: Either::Left(Tag::Specific("v2.4.0".to_string())),
                     },
                 };
 

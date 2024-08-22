@@ -17,6 +17,7 @@ pub enum Error {
     ExtractTokenBody(reqwest::Error),
     DeserializeToken(serde_json::Error, String),
     ParseAuthorizationHeader(reqwest::header::InvalidHeaderValue),
+    InvalidImageUrl(crate::image::FromUrlError),
 }
 
 impl std::fmt::Display for Error {
@@ -50,6 +51,9 @@ impl std::fmt::Display for Error {
             }
             Self::ParseAuthorizationHeader(e) => {
                 write!(f, "Failed to parse authorization header: {e}")
+            }
+            Self::InvalidImageUrl(e) => {
+                write!(f, "Failed to parse image from url: {e}")
             }
         }
     }
