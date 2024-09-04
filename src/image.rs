@@ -65,13 +65,13 @@ impl std::str::FromStr for Image {
         // prom/prometheus:v2.53.2
         // quay.io/openshift-community-operators/external-secrets-operator:v0.9.9
         // registry.access.redhat.com/ubi8:8.9
-        match components.len() {
-            0 => Err(FromStrError::MissingFirstComponent),
+        match components.as_slice() {
+            [] => Err(FromStrError::MissingFirstComponent),
 
             // Case where only a docker image name is provided without a registry we default to
             // DockerHub as a registry and the library repository
-            1 => {
-                let image_name = s.parse().map_err(Self::Err::ParseImageName)?;
+            [image_name] => {
+                let image_name = image_name.parse().map_err(Self::Err::ParseImageName)?;
 
                 Ok(Image {
                     registry: Registry::DockerHub,
@@ -83,68 +83,38 @@ impl std::str::FromStr for Image {
 
             // Case where we have a registry and a docker image name without a repository, or a
             // registry without a repository and a docker image name
-            2 => {
-                let registry = components
-                    .first()
-                    .expect("should never fail as we have 2 components")
-                    .parse();
+            [registry_or_repository, image_name] => {
+                let result = registry_or_repository.parse();
 
-                match registry {
-                    Err(_) => {
-                        let repository = (*components
-                            .first()
-                            .expect("should never fail as we have 2 components"))
-                        .to_string();
+                if let Ok(registry) = result {
+                    let image_name = image_name.parse().map_err(Self::Err::ParseImageName)?;
 
-                        let image_name = components
-                            .get(1)
-                            .expect("should never fail as we have 2 components")
-                            .parse()
-                            .map_err(Self::Err::ParseImageName)?;
+                    Ok(Image {
+                        registry,
+                        namespace: None,
+                        repository: None,
+                        image_name,
+                    })
+                } else {
+                    // Case where we have a repository and a docker image name as the registry
+                    // could not be parsed
+                    let repository = (*registry_or_repository).to_string();
+                    let image_name = image_name.parse().map_err(Self::Err::ParseImageName)?;
 
-                        Ok(Image {
-                            registry: Registry::DockerHub,
-                            namespace: None,
-                            repository: Some(repository),
-                            image_name,
-                        })
-                    }
-
-                    Ok(registry) => {
-                        let image_name = components
-                            .get(1)
-                            .expect("should never fail as we have 2 components")
-                            .parse()
-                            .map_err(Self::Err::ParseImageName)?;
-
-                        Ok(Image {
-                            registry,
-                            namespace: None,
-                            repository: None,
-                            image_name,
-                        })
-                    }
+                    Ok(Image {
+                        registry: Registry::DockerHub,
+                        namespace: None,
+                        repository: Some(repository),
+                        image_name,
+                    })
                 }
             }
 
             // Case where we have a registry, a repository and a docker image name
-            3 => {
-                let registry = components
-                    .first()
-                    .expect("should never fail as we have 3 components")
-                    .parse()
-                    .map_err(Self::Err::ParseRegistry)?;
-
-                let repository = (*components
-                    .get(1)
-                    .expect("should never fail as we have 3 components"))
-                .to_string();
-
-                let image_name = components
-                    .get(2)
-                    .expect("should never fail as we have 3 components")
-                    .parse()
-                    .map_err(Self::Err::ParseImageName)?;
+            [registry, repository, image_name] => {
+                let registry = registry.parse().map_err(Self::Err::ParseRegistry)?;
+                let repository = (*repository).to_string();
+                let image_name = image_name.parse().map_err(Self::Err::ParseImageName)?;
 
                 Ok(Image {
                     registry,
@@ -155,28 +125,11 @@ impl std::str::FromStr for Image {
             }
 
             // Case where we have a registry, a repository and a docker image name and a namespace
-            4 => {
-                let registry = components
-                    .first()
-                    .expect("should never fail as we have 4 components")
-                    .parse()
-                    .map_err(Self::Err::ParseRegistry)?;
-
-                let namespace = (*components
-                    .get(1)
-                    .expect("should never fail as we have 4 components"))
-                .to_string();
-
-                let repository = (*components
-                    .get(2)
-                    .expect("should never fail as we have 4 components"))
-                .to_string();
-
-                let image_name = components
-                    .get(3)
-                    .expect("should never fail as we have 4 components")
-                    .parse()
-                    .map_err(Self::Err::ParseImageName)?;
+            [registry, namespace, repository, image_name] => {
+                let registry = registry.parse().map_err(Self::Err::ParseRegistry)?;
+                let namespace = (*namespace).to_string();
+                let repository = (*repository).to_string();
+                let image_name = image_name.parse().map_err(Self::Err::ParseImageName)?;
 
                 Ok(Image {
                     registry,
