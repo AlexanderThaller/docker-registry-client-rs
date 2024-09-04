@@ -1,8 +1,3 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
-
 use reqwest::{
     header::HeaderMap,
     Client as HTTPClient,
@@ -11,7 +6,6 @@ use serde::{
     Deserialize,
     Serialize,
 };
-use tokio::sync::RwLock;
 use tracing::{
     info_span,
     Instrument,
@@ -25,19 +19,19 @@ use crate::{
 };
 
 mod error;
+mod token;
 
 pub use error::Error;
+use token::{
+    Token,
+    TokenCache,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct Client {
     client: HTTPClient,
 
-    token_cache: Arc<RwLock<HashMap<CacheKey, String>>>,
-}
-
-#[derive(Debug, Eq, PartialEq, Hash)]
-struct CacheKey {
-    url: Url,
+    token_cache: TokenCache,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,30 +136,18 @@ impl Client {
         ))
         .map_err(Error::InvalidManifestUrl)?;
 
-        self.get_manifest_url(&url, &image).await
+        self.get_manifest_url(&url, image).await
     }
 
     #[tracing::instrument]
     async fn get_headers(&self, url: &Url, image: &Image) -> Result<HeaderMap, Error> {
-        #[derive(Debug, serde::Deserialize)]
-        struct Token {
-            token: String,
-        }
-
         if !image.registry.needs_authentication() {
             return Ok(HeaderMap::new());
         }
 
-        let cache_key = CacheKey { url: url.clone() };
+        let cache_key = url.into();
 
-        let token_cache = self
-            .token_cache
-            .read()
-            .instrument(info_span!("get token from cache"))
-            .await;
-
-        let token = token_cache.get(&cache_key).cloned();
-        drop(token_cache);
+        let token = self.token_cache.fetch(&cache_key);
 
         let token = if let Some(token) = token {
             token
@@ -212,23 +194,12 @@ impl Client {
             let token: Token =
                 serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
 
-            let mut token_cache = self
-                .token_cache
-                .write()
-                .instrument(info_span!("write token to cache"))
-                .await;
-            token_cache.insert(cache_key, token.token.clone());
+            self.token_cache.store(cache_key, token.clone());
 
-            token.token
+            token
         };
 
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "Authorization",
-            format!("Bearer {token}")
-                .parse()
-                .map_err(Error::ParseAuthorizationHeader)?,
-        );
+        let headers = token.try_into().map_err(Error::ParseAuthorizationHeader)?;
 
         Ok(headers)
     }

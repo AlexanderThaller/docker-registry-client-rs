@@ -1,0 +1,9 @@
+---
+source: src/docker/token.rs
+expression: got
+---
+{
+  "token": "djE6c2lnc3RvcmUvY29zaWduL2Nvc2lnbjoxNzI1NDM2OTAwNTczODMyMzM2",
+  "expires_in": null,
+  "issued_at": null
+}
