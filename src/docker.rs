@@ -27,10 +27,10 @@ use token::{
     TokenCache,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Client {
     client: HTTPClient,
-    token_cache: TokenCache,
+    token_cache: Box<dyn TokenCache + Send>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,13 +39,22 @@ pub struct Response {
     pub manifest: Manifest,
 }
 
+impl Default for Client {
+    fn default() -> Self {
+        Self {
+            client: HTTPClient::new(),
+            token_cache: Box::new(token::MemoryTokenCache::default()),
+        }
+    }
+}
+
 impl Client {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn get_manifest_url(&self, url: &Url, image: &Image) -> Result<Response, Error> {
         let mut headers = self.get_headers(url, image).await?;
 
@@ -115,7 +124,7 @@ impl Client {
     /// Returns an error if the response body is not valid JSON.
     /// Returns an error if the response body is not a valid manifest.
     /// Returns an error if the response status is not successful.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn get_manifest(&self, image: &Image) -> Result<Response, Error> {
         let registry_domain = image.registry.registry_domain();
 
@@ -138,7 +147,7 @@ impl Client {
         self.get_manifest_url(&url, image).await
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     async fn get_headers(&self, url: &Url, image: &Image) -> Result<HeaderMap, Error> {
         if !image.registry.needs_authentication() {
             return Ok(HeaderMap::new());

@@ -30,14 +30,34 @@ pub(super) struct Token {
     issued_at: Option<DateTime<Utc>>,
 }
 
+pub(super) trait TokenCache: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+    fn fetch(&self, key: &CacheKey) -> Option<Token>;
+    fn store(&self, key: CacheKey, token: Token);
+}
+
+dyn_clone::clone_trait_object!(TokenCache);
+
+/// `NoCache` is a token cache that does not cache tokens.
 #[derive(Debug, Default, Clone)]
-pub(super) struct TokenCache {
+pub struct NoCache;
+
+/// `MemoryTokenCache` is a token cache that caches tokens in memory.
+#[derive(Debug, Default, Clone)]
+pub struct MemoryTokenCache {
     cache: Arc<RwLock<HashMap<CacheKey, Token>>>,
 }
 
-impl TokenCache {
+impl TokenCache for NoCache {
+    fn fetch(&self, _key: &CacheKey) -> Option<Token> {
+        None
+    }
+
+    fn store(&self, _key: CacheKey, _token: Token) {}
+}
+
+impl TokenCache for MemoryTokenCache {
     #[tracing::instrument]
-    pub(super) fn fetch(&self, key: &CacheKey) -> Option<Token> {
+    fn fetch(&self, key: &CacheKey) -> Option<Token> {
         self.cache
             .read()
             .expect("failed to get read lock")
@@ -62,7 +82,7 @@ impl TokenCache {
     }
 
     #[tracing::instrument]
-    pub(super) fn store(&self, key: CacheKey, token: Token) {
+    fn store(&self, key: CacheKey, token: Token) {
         self.cache
             .write()
             .expect("failed to get write lock")
