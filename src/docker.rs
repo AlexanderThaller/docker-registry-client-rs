@@ -30,7 +30,6 @@ use token::{
 #[derive(Debug, Default, Clone)]
 pub struct Client {
     client: HTTPClient,
-
     token_cache: TokenCache,
 }
 

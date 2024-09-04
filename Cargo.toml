@@ -15,6 +15,12 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
+redis-macros = { version = "0.4", optional = true }
+redis = { version = "0.26", features = ["tokio-comp", "connection-manager"], optional = true }
+
+[features]
+default = []
+redis_cache = ["redis"]
 
 [dev-dependencies]
 eyre = "0.6"
