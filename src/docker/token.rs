@@ -47,6 +47,12 @@ pub struct MemoryTokenCache {
     cache: Arc<RwLock<HashMap<CacheKey, Token>>>,
 }
 
+#[cfg(feature = "redis_cache")]
+#[derive(Debug, Clone)]
+pub struct RedisCache {
+    client: redis::Client,
+}
+
 impl TokenCache for NoCache {
     fn fetch(&self, _key: &CacheKey) -> Option<Token> {
         None
@@ -110,6 +116,24 @@ impl TryInto<HeaderMap> for Token {
         headers.insert("Authorization", format!("Bearer {}", self.value).parse()?);
 
         Ok(headers)
+    }
+}
+
+#[cfg(feature = "redis_cache")]
+impl RedisCache {
+    pub fn new(client: redis::Client) -> Self {
+        Self { client }
+    }
+}
+
+#[cfg(feature = "redis_cache")]
+impl TokenCache for RedisCache {
+    fn fetch(&self, key: &CacheKey) -> Option<Token> {
+        todo!()
+    }
+
+    fn store(&self, key: CacheKey, token: Token) {
+        todo!()
     }
 }
 

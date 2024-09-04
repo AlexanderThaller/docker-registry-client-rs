@@ -17,7 +17,7 @@ tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 
 [features]
-default = []
+default = ["redis_cache"]
 redis_cache = ["redis"]
 
 [dev-dependencies]
