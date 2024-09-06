@@ -60,6 +60,7 @@ pub(super) struct MemoryTokenCache {
 }
 
 #[cfg(feature = "redis_cache")]
+/// `RedisCache` is a token cache that caches tokens in Redis.
 #[derive(Debug, Clone)]
 pub(super) struct RedisCache {
     client: redis::Client,
@@ -70,8 +71,9 @@ impl std::fmt::Display for CacheKey {
         let registry = self.image.registry.to_string();
         let namespace = self.image.namespace.as_ref();
         let repository = self.image.repository.as_ref();
+        let image_name = &self.image.image_name.name;
 
-        write!(f, "{registry}{namespace:?}{repository:?}")
+        write!(f, "{registry}{namespace:?}{repository:?}{image_name}")
     }
 }
 
