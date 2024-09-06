@@ -15,11 +15,22 @@ use serde::{
     Deserialize,
     Serialize,
 };
-use url::Url;
+use tracing::{
+    info_span,
+    Instrument,
+};
+
+#[cfg(feature = "redis_cache")]
+use redis::AsyncCommands;
+
+use crate::Image;
+
+#[cfg(feature = "redis_cache")]
+const REDIS_PREFIX: &str = "docker-registry-client:token";
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub(super) struct CacheKey {
-    url: Url,
+    image: Image,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
@@ -30,14 +41,53 @@ pub(super) struct Token {
     issued_at: Option<DateTime<Utc>>,
 }
 
+#[async_trait::async_trait]
+pub(super) trait Cache: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+    async fn fetch(&self, key: &CacheKey) -> Option<Token>;
+    async fn store(&self, key: CacheKey, token: Token);
+}
+
+dyn_clone::clone_trait_object!(Cache);
+
+/// `NoCache` is a token cache that does not cache tokens.
 #[derive(Debug, Default, Clone)]
-pub(super) struct TokenCache {
+pub(super) struct NoCache;
+
+/// `MemoryTokenCache` is a token cache that caches tokens in memory.
+#[derive(Debug, Default, Clone)]
+pub(super) struct MemoryTokenCache {
     cache: Arc<RwLock<HashMap<CacheKey, Token>>>,
 }
 
-impl TokenCache {
+#[cfg(feature = "redis_cache")]
+#[derive(Debug, Clone)]
+pub(super) struct RedisCache {
+    client: redis::Client,
+}
+
+impl std::fmt::Display for CacheKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let registry = self.image.registry.to_string();
+        let namespace = self.image.namespace.as_ref();
+        let repository = self.image.repository.as_ref();
+
+        write!(f, "{registry}{namespace:?}{repository:?}")
+    }
+}
+
+#[async_trait::async_trait]
+impl Cache for NoCache {
+    async fn fetch(&self, _key: &CacheKey) -> Option<Token> {
+        None
+    }
+
+    async fn store(&self, _key: CacheKey, _token: Token) {}
+}
+
+#[async_trait::async_trait]
+impl Cache for MemoryTokenCache {
     #[tracing::instrument]
-    pub(super) fn fetch(&self, key: &CacheKey) -> Option<Token> {
+    async fn fetch(&self, key: &CacheKey) -> Option<Token> {
         self.cache
             .read()
             .expect("failed to get read lock")
@@ -62,7 +112,7 @@ impl TokenCache {
     }
 
     #[tracing::instrument]
-    pub(super) fn store(&self, key: CacheKey, token: Token) {
+    async fn store(&self, key: CacheKey, token: Token) {
         self.cache
             .write()
             .expect("failed to get write lock")
@@ -70,15 +120,11 @@ impl TokenCache {
     }
 }
 
-impl From<Url> for CacheKey {
-    fn from(url: Url) -> Self {
-        Self { url }
-    }
-}
-
-impl From<&Url> for CacheKey {
-    fn from(url: &Url) -> Self {
-        Self { url: url.clone() }
+impl From<&Image> for CacheKey {
+    fn from(image: &Image) -> Self {
+        Self {
+            image: image.clone(),
+        }
     }
 }
 
@@ -90,6 +136,78 @@ impl TryInto<HeaderMap> for Token {
         headers.insert("Authorization", format!("Bearer {}", self.value).parse()?);
 
         Ok(headers)
+    }
+}
+
+#[cfg(feature = "redis_cache")]
+impl RedisCache {
+    #[must_use]
+    pub fn new(client: redis::Client) -> Self {
+        Self { client }
+    }
+}
+
+#[cfg(feature = "redis_cache")]
+#[async_trait::async_trait]
+impl Cache for RedisCache {
+    #[tracing::instrument]
+    async fn fetch(&self, key: &CacheKey) -> Option<Token> {
+        let mut connection = self
+            .client
+            .get_multiplexed_async_connection()
+            .instrument(info_span!("get redis connection"))
+            .await
+            .expect("failed to get connection");
+
+        let key = format!("{REDIS_PREFIX}:{key}");
+
+        let exists: bool = connection
+            .exists(&key)
+            .instrument(info_span!("check if key exists"))
+            .await
+            .expect("failed to check if key exists");
+
+        if !exists {
+            return None;
+        }
+
+        let value: String = connection
+            .get(&key)
+            .instrument(info_span!("get value"))
+            .await
+            .expect("failed to get value");
+
+        let token = serde_json::from_str(&value).expect("failed to deserialize token");
+
+        Some(token)
+    }
+
+    #[tracing::instrument]
+    async fn store(&self, key: CacheKey, token: Token) {
+        let mut connection = self
+            .client
+            .get_multiplexed_async_connection()
+            .instrument(info_span!("get redis connection"))
+            .await
+            .expect("failed to get connection");
+
+        let key = format!("{REDIS_PREFIX}:{key}");
+
+        let value = serde_json::to_string(&token).expect("failed to serialize token");
+
+        connection
+            .set::<&String, String, String>(&key, value)
+            .instrument(info_span!("set value"))
+            .await
+            .expect("failed to set value");
+
+        if let Some(expires_in) = token.expires_in {
+            connection
+                .expire::<&String, String>(&key, expires_in)
+                .instrument(info_span!("set expire"))
+                .await
+                .expect("failed to set expiration");
+        }
     }
 }
 

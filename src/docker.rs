@@ -19,19 +19,18 @@ use crate::{
 };
 
 mod error;
-mod token;
+pub mod token;
 
 pub use error::Error;
 use token::{
+    Cache as TokenCache,
     Token,
-    TokenCache,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Client {
     client: HTTPClient,
-
-    token_cache: TokenCache,
+    token_cache: Box<dyn TokenCache + Send>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,15 +39,37 @@ pub struct Response {
     pub manifest: Manifest,
 }
 
+impl Default for Client {
+    fn default() -> Self {
+        Self {
+            client: HTTPClient::new(),
+            token_cache: Box::new(token::MemoryTokenCache::default()),
+        }
+    }
+}
+
 impl Client {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    pub fn set_cache_memory(&mut self) {
+        self.token_cache = Box::new(token::MemoryTokenCache::default());
+    }
+
+    pub fn disable_caching(&mut self) {
+        self.token_cache = Box::new(token::NoCache);
+    }
+
+    #[cfg(feature = "redis_cache")]
+    pub fn set_cache_redis(&mut self, redis_client: redis::Client) {
+        self.token_cache = Box::new(token::RedisCache::new(redis_client));
+    }
+
     #[tracing::instrument]
     pub async fn get_manifest_url(&self, url: &Url, image: &Image) -> Result<Response, Error> {
-        let mut headers = self.get_headers(url, image).await?;
+        let mut headers = self.get_headers(image).await?;
 
         let accept_header = [
             "application/vnd.docker.container.image.v1+json",
@@ -116,7 +137,7 @@ impl Client {
     /// Returns an error if the response body is not valid JSON.
     /// Returns an error if the response body is not a valid manifest.
     /// Returns an error if the response status is not successful.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub async fn get_manifest(&self, image: &Image) -> Result<Response, Error> {
         let registry_domain = image.registry.registry_domain();
 
@@ -139,15 +160,15 @@ impl Client {
         self.get_manifest_url(&url, image).await
     }
 
-    #[tracing::instrument]
-    async fn get_headers(&self, url: &Url, image: &Image) -> Result<HeaderMap, Error> {
+    #[tracing::instrument(skip_all)]
+    async fn get_headers(&self, image: &Image) -> Result<HeaderMap, Error> {
         if !image.registry.needs_authentication() {
             return Ok(HeaderMap::new());
         }
 
-        let cache_key = url.into();
+        let cache_key = image.into();
 
-        let token = self.token_cache.fetch(&cache_key);
+        let token = self.token_cache.fetch(&cache_key).await;
 
         let token = if let Some(token) = token {
             token
@@ -194,7 +215,7 @@ impl Client {
             let token: Token =
                 serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
 
-            self.token_cache.store(cache_key, token.clone());
+            self.token_cache.store(cache_key, token.clone()).await;
 
             token
         };

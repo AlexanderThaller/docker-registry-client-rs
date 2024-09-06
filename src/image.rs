@@ -25,7 +25,7 @@ pub enum FromStrError {
 #[derive(Debug)]
 pub enum FromUrlError {}
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct Image {
     pub registry: Registry,
     pub namespace: Option<String>,

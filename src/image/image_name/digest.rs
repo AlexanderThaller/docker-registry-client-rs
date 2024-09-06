@@ -1,7 +1,7 @@
 #[derive(Debug)]
 pub enum FromStrError {}
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct Digest(String);
 
 impl std::fmt::Display for FromStrError {

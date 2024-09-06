@@ -15,7 +15,7 @@ pub enum FromStrError {
     ParseTag(tag::FromStrError),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct ImageName {
     pub name: String,
     pub identifier: Either<Tag, Digest>,
