@@ -168,7 +168,7 @@ impl Client {
 
         let cache_key = image.into();
 
-        let token = self.token_cache.fetch(&cache_key);
+        let token = self.token_cache.fetch(&cache_key).await;
 
         let token = if let Some(token) = token {
             token
@@ -215,7 +215,7 @@ impl Client {
             let token: Token =
                 serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
 
-            self.token_cache.store(cache_key, token.clone());
+            self.token_cache.store(cache_key, token.clone()).await;
 
             token
         };
