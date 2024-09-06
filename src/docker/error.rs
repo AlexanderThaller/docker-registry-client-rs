@@ -1,5 +1,7 @@
 use url::Url;
 
+use crate::docker::token_cache;
+
 #[derive(Debug)]
 pub enum Error {
     GetManifest(reqwest::Error),
@@ -18,6 +20,8 @@ pub enum Error {
     DeserializeToken(serde_json::Error, String),
     ParseAuthorizationHeader(reqwest::header::InvalidHeaderValue),
     InvalidImageUrl(crate::image::FromUrlError),
+    FetchToken(token_cache::FetchError),
+    StoreToken(token_cache::StoreError),
 }
 
 impl std::fmt::Display for Error {
@@ -55,6 +59,8 @@ impl std::fmt::Display for Error {
             Self::InvalidImageUrl(e) => {
                 write!(f, "Failed to parse image from url: {e}")
             }
+            Self::FetchToken(e) => write!(f, "Failed to fetch token from cache: {e}"),
+            Self::StoreToken(e) => write!(f, "Failed to store token in cache: {e}"),
         }
     }
 }

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::BTreeMap;
 
 use chrono::{
@@ -351,7 +349,7 @@ impl std::fmt::Display for OperatingSystem {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "unwrap use in tests is fine")]
 mod tests {
     mod list {
         mod deserialize {

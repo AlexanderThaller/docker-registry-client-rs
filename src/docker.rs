@@ -20,12 +20,11 @@ use crate::{
 
 mod error;
 pub mod token;
+pub mod token_cache;
 
 pub use error::Error;
-use token::{
-    Cache as TokenCache,
-    Token,
-};
+use token::Token;
+use token_cache::Cache as TokenCache;
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -43,7 +42,7 @@ impl Default for Client {
     fn default() -> Self {
         Self {
             client: HTTPClient::new(),
-            token_cache: Box::new(token::MemoryTokenCache::default()),
+            token_cache: Box::new(token_cache::MemoryTokenCache::default()),
         }
     }
 }
@@ -55,16 +54,16 @@ impl Client {
     }
 
     pub fn set_cache_memory(&mut self) {
-        self.token_cache = Box::new(token::MemoryTokenCache::default());
+        self.token_cache = Box::new(token_cache::MemoryTokenCache::default());
     }
 
     pub fn disable_caching(&mut self) {
-        self.token_cache = Box::new(token::NoCache);
+        self.token_cache = Box::new(token_cache::NoCache);
     }
 
     #[cfg(feature = "redis_cache")]
     pub fn set_cache_redis(&mut self, redis_client: redis::Client) {
-        self.token_cache = Box::new(token::RedisCache::new(redis_client));
+        self.token_cache = Box::new(token_cache::RedisCache::new(redis_client));
     }
 
     #[tracing::instrument]
@@ -168,7 +167,11 @@ impl Client {
 
         let cache_key = image.into();
 
-        let token = self.token_cache.fetch(&cache_key).await;
+        let token = self
+            .token_cache
+            .fetch(&cache_key)
+            .await
+            .map_err(Error::FetchToken)?;
 
         let token = if let Some(token) = token {
             token
@@ -215,7 +218,7 @@ impl Client {
             let token: Token =
                 serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
 
-            self.token_cache.store(cache_key, token.clone()).await;
+            self.token_cache.store(cache_key, token.clone()).await.map_err(Error::StoreToken)?;
 
             token
         };
@@ -227,6 +230,7 @@ impl Client {
 }
 
 #[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod tests {
     mod dockerhub {
         use crate::{
@@ -289,8 +293,9 @@ mod tests {
 
         #[tokio::test]
         async fn cosign() {
-            let client = Client::new();
             const INPUT: &str = "ghcr.io/sigstore/cosign/cosign:v2.4.0";
+
+            let client = Client::new();
             let image = INPUT.parse().unwrap();
             let response = client.get_manifest(&image).await.unwrap();
 

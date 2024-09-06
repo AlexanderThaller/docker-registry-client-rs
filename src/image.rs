@@ -4,7 +4,10 @@ use serde::{
 };
 use tracing::error;
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "This module is about image_names so its fine to repeat the name"
+)]
 pub mod image_name;
 pub mod registry;
 
@@ -191,6 +194,7 @@ impl<'de> Deserialize<'de> for Image {
 }
 
 #[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod tests {
     mod from_str {
         use either::Either;
