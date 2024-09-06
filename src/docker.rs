@@ -19,12 +19,12 @@ use crate::{
 };
 
 mod error;
-mod token;
+pub mod token;
 
 pub use error::Error;
 use token::{
+    Cache as TokenCache,
     Token,
-    TokenCache,
 };
 
 #[derive(Debug, Clone)]
@@ -54,9 +54,22 @@ impl Client {
         Self::default()
     }
 
+    pub fn set_cache_memory(&mut self) {
+        self.token_cache = Box::new(token::MemoryTokenCache::default());
+    }
+
+    pub fn disable_caching(&mut self) {
+        self.token_cache = Box::new(token::NoCache);
+    }
+
+    #[cfg(feature = "redis_cache")]
+    pub fn set_cache_redis(&mut self, redis_client: redis::Client) {
+        self.token_cache = Box::new(token::RedisCache::new(redis_client));
+    }
+
     #[tracing::instrument(skip_all)]
     pub async fn get_manifest_url(&self, url: &Url, image: &Image) -> Result<Response, Error> {
-        let mut headers = self.get_headers(url, image).await?;
+        let mut headers = self.get_headers(image).await?;
 
         let accept_header = [
             "application/vnd.docker.container.image.v1+json",
@@ -148,12 +161,12 @@ impl Client {
     }
 
     #[tracing::instrument(skip_all)]
-    async fn get_headers(&self, url: &Url, image: &Image) -> Result<HeaderMap, Error> {
+    async fn get_headers(&self, image: &Image) -> Result<HeaderMap, Error> {
         if !image.registry.needs_authentication() {
             return Ok(HeaderMap::new());
         }
 
-        let cache_key = url.into();
+        let cache_key = image.into();
 
         let token = self.token_cache.fetch(&cache_key);
 

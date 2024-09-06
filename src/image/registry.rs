@@ -20,6 +20,12 @@ impl std::fmt::Display for FromStrError {
 
 impl std::error::Error for FromStrError {}
 
+impl std::fmt::Display for Registry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.registry_domain())
+    }
+}
+
 impl std::str::FromStr for Registry {
     type Err = FromStrError;
 

@@ -15,11 +15,18 @@ use serde::{
     Deserialize,
     Serialize,
 };
-use url::Url;
+
+#[cfg(feature = "redis_cache")]
+use redis::Commands;
+
+use crate::Image;
+
+#[cfg(feature = "redis_cache")]
+const REDIS_PREFIX: &str = "docker-registry-client:token";
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub(super) struct CacheKey {
-    url: Url,
+    image: Image,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
@@ -30,30 +37,40 @@ pub(super) struct Token {
     issued_at: Option<DateTime<Utc>>,
 }
 
-pub(super) trait TokenCache: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+pub(super) trait Cache: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn fetch(&self, key: &CacheKey) -> Option<Token>;
     fn store(&self, key: CacheKey, token: Token);
 }
 
-dyn_clone::clone_trait_object!(TokenCache);
+dyn_clone::clone_trait_object!(Cache);
 
 /// `NoCache` is a token cache that does not cache tokens.
 #[derive(Debug, Default, Clone)]
-pub struct NoCache;
+pub(super) struct NoCache;
 
 /// `MemoryTokenCache` is a token cache that caches tokens in memory.
 #[derive(Debug, Default, Clone)]
-pub struct MemoryTokenCache {
+pub(super) struct MemoryTokenCache {
     cache: Arc<RwLock<HashMap<CacheKey, Token>>>,
 }
 
 #[cfg(feature = "redis_cache")]
 #[derive(Debug, Clone)]
-pub struct RedisCache {
+pub(super) struct RedisCache {
     client: redis::Client,
 }
 
-impl TokenCache for NoCache {
+impl std::fmt::Display for CacheKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let registry = self.image.registry.to_string();
+        let namespace = self.image.namespace.as_ref();
+        let repository = self.image.repository.as_ref();
+
+        write!(f, "{registry}{namespace:?}{repository:?}")
+    }
+}
+
+impl Cache for NoCache {
     fn fetch(&self, _key: &CacheKey) -> Option<Token> {
         None
     }
@@ -61,7 +78,7 @@ impl TokenCache for NoCache {
     fn store(&self, _key: CacheKey, _token: Token) {}
 }
 
-impl TokenCache for MemoryTokenCache {
+impl Cache for MemoryTokenCache {
     #[tracing::instrument]
     fn fetch(&self, key: &CacheKey) -> Option<Token> {
         self.cache
@@ -96,15 +113,11 @@ impl TokenCache for MemoryTokenCache {
     }
 }
 
-impl From<Url> for CacheKey {
-    fn from(url: Url) -> Self {
-        Self { url }
-    }
-}
-
-impl From<&Url> for CacheKey {
-    fn from(url: &Url) -> Self {
-        Self { url: url.clone() }
+impl From<&Image> for CacheKey {
+    fn from(image: &Image) -> Self {
+        Self {
+            image: image.clone(),
+        }
     }
 }
 
@@ -121,19 +134,57 @@ impl TryInto<HeaderMap> for Token {
 
 #[cfg(feature = "redis_cache")]
 impl RedisCache {
+    #[must_use]
     pub fn new(client: redis::Client) -> Self {
         Self { client }
     }
 }
 
 #[cfg(feature = "redis_cache")]
-impl TokenCache for RedisCache {
+impl Cache for RedisCache {
+    #[tracing::instrument]
     fn fetch(&self, key: &CacheKey) -> Option<Token> {
-        todo!()
+        let mut connection = self
+            .client
+            .get_connection()
+            .expect("failed to get connection");
+
+        let key = format!("{REDIS_PREFIX}:{key}");
+
+        let exists: bool = connection
+            .exists(&key)
+            .expect("failed to check if key exists");
+
+        if !exists {
+            return None;
+        }
+
+        let value: String = connection.get(&key).expect("failed to get value");
+        let token = serde_json::from_str(&value).expect("failed to deserialize token");
+
+        Some(token)
     }
 
+    #[tracing::instrument]
     fn store(&self, key: CacheKey, token: Token) {
-        todo!()
+        let mut connection = self
+            .client
+            .get_connection()
+            .expect("failed to get connection");
+
+        let key = format!("{REDIS_PREFIX}:{key}");
+
+        let value = serde_json::to_string(&token).expect("failed to serialize token");
+
+        connection
+            .set::<&String, String, String>(&key, value)
+            .expect("failed to set value");
+
+        if let Some(expires_in) = token.expires_in {
+            connection
+                .expire::<&String, String>(&key, expires_in)
+                .expect("failed to set expiration");
+        }
     }
 }
 
