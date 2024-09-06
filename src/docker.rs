@@ -67,7 +67,7 @@ impl Client {
         self.token_cache = Box::new(token::RedisCache::new(redis_client));
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument]
     pub async fn get_manifest_url(&self, url: &Url, image: &Image) -> Result<Response, Error> {
         let mut headers = self.get_headers(image).await?;
 
