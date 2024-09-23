@@ -9,7 +9,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dyn-clone = "1"
 either = "1"
 redis-macros = { version = "0.4", optional = true }
-redis = { version = "0.26", features = ["tokio-comp", "connection-manager"], optional = true }
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"], optional = true }
 reqwest = { version = "0.12", default-features = false, features = [ "json", "rustls-tls", ] }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
