@@ -3,6 +3,7 @@
 #![warn(clippy::allow_attributes)]
 #![warn(clippy::allow_attributes_without_reason)]
 #![warn(clippy::dbg_macro)]
+#![warn(clippy::todo)]
 #![warn(clippy::expect_used)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::unwrap_used)]

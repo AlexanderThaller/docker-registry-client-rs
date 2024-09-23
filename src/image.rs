@@ -42,8 +42,10 @@ impl std::fmt::Display for FromStrError {
             Self::MissingFirstComponent => write!(f, "missing first component"),
             Self::UnsupportedImageName(s) => write!(f, "unsupported image name: {s}"),
             Self::ParseImageName(err) => write!(f, "{err}"),
-
-            _ => todo!(),
+            Self::MissingRegistry => write!(f, "missing registry"),
+            Self::MissingImageName => write!(f, "missing image name"),
+            Self::ParseRegistry(err) => write!(f, "failed to parse registry: {err}"),
+            Self::MissingRepository => write!(f, "missing repository"),
         }
     }
 }
@@ -51,8 +53,8 @@ impl std::fmt::Display for FromStrError {
 impl std::error::Error for FromStrError {}
 
 impl std::fmt::Display for FromUrlError {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("failed to parse image from URL")
     }
 }
 

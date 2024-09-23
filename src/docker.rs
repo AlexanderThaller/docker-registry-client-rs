@@ -218,7 +218,10 @@ impl Client {
             let token: Token =
                 serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
 
-            self.token_cache.store(cache_key, token.clone()).await.map_err(Error::StoreToken)?;
+            self.token_cache
+                .store(cache_key, token.clone())
+                .await
+                .map_err(Error::StoreToken)?;
 
             token
         };

@@ -22,8 +22,14 @@ pub struct ImageName {
 }
 
 impl std::fmt::Display for FromStrError {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingNameDigest => f.write_str("missing name and digest"),
+            Self::MissingNameTag => f.write_str("missing name and tag"),
+            Self::MissingDigest => f.write_str("missing digest"),
+            Self::ParseDigest(e) => write!(f, "error parsing digest: {e}"),
+            Self::ParseTag(e) => write!(f, "error parsing tag: {e}"),
+        }
     }
 }
 

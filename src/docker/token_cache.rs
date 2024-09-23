@@ -198,7 +198,7 @@ impl Cache for RedisCache {
                 .expire::<&String, String>(&key, expires_in)
                 .instrument(info_span!("set expire"))
                 .await
-            .map_err(StoreError::SetExpiration)?;
+                .map_err(StoreError::SetExpiration)?;
         }
 
         Ok(())

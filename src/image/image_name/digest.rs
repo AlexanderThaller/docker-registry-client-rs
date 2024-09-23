@@ -5,8 +5,8 @@ pub enum FromStrError {}
 pub struct Digest(String);
 
 impl std::fmt::Display for FromStrError {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("invalid digest")
     }
 }
 
