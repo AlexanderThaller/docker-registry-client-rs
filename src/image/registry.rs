@@ -7,9 +7,10 @@ pub enum FromStrError {
 pub enum Registry {
     DockerHub,
     Github,
+    Google,
+    K8s,
     Quay,
     RedHat,
-    K8s,
 }
 
 impl std::fmt::Display for FromStrError {
@@ -34,6 +35,7 @@ impl std::str::FromStr for Registry {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "docker.io" | "index.docker.io" => Ok(Registry::DockerHub),
+            "gcr.io" => Ok(Registry::Google),
             "ghcr.io" => Ok(Registry::Github),
             "quay.io" => Ok(Registry::Quay),
             "registry.access.redhat.com" => Ok(Registry::RedHat),
@@ -50,9 +52,10 @@ impl Registry {
         match self {
             Self::DockerHub => "index.docker.io",
             Self::Github => "ghcr.io",
+            Self::Google => "gcr.io",
+            Self::K8s => "registry.k8s.io",
             Self::Quay => "quay.io",
             Self::RedHat => "registry.access.redhat.com",
-            Self::K8s => "registry.k8s.io",
         }
     }
 
@@ -60,7 +63,7 @@ impl Registry {
     pub fn needs_authentication(&self) -> bool {
         match self {
             Self::DockerHub | Self::Github | Self::Quay => true,
-            Self::RedHat | Self::K8s => false,
+            Self::RedHat | Self::K8s | Self::Google => false,
         }
     }
 }
