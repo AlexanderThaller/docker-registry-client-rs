@@ -196,7 +196,7 @@ impl Client {
 
                 Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{namespace}{repository}{image_name}:pull&service=quay.io", image_name = image.image_name.name),
 
-                Registry::RedHat | Registry::K8s | Registry::Google => return Ok(HeaderMap::new()),
+                Registry::RedHat | Registry::K8s | Registry::Google | Registry::Microsoft => return Ok(HeaderMap::new()),
             };
 
             let token_url = Url::parse(&token_url).map_err(Error::InvalidTokenUrl)?;
@@ -297,6 +297,17 @@ mod tests {
         #[tokio::test]
         async fn cosign() {
             const INPUT: &str = "ghcr.io/sigstore/cosign/cosign:v2.4.0";
+
+            let client = Client::new();
+            let image = INPUT.parse().unwrap();
+            let response = client.get_manifest(&image).await.unwrap();
+
+            insta::assert_json_snapshot!(response);
+        }
+
+        #[tokio::test]
+        async fn playwright() {
+            const INPUT: &str = "mcr.microsoft.com/playwright:v1.48.2-noble";
 
             let client = Client::new();
             let image = INPUT.parse().unwrap();
