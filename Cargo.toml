@@ -4,6 +4,23 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 
+authors = ["Alexander Thaller <alexander@thaller.ws>"]
+description = "Communicate with Docker Registries to fetch image metadata."
+documentation = "https://docs.rs/docker-registry-client/"
+homepage = "https://github.com/AlexanderThaller/docker-registry-client"
+keywords = [
+  "docker",
+  "registry",
+  "container",
+  "oci",
+  "image",
+  "metadata",
+  "client",
+]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/AlexanderThaller/docker-registry-client"
+
 [dependencies]
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
