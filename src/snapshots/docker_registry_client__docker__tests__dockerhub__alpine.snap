@@ -3,7 +3,7 @@ source: src/docker.rs
 expression: response
 ---
 {
-  "digest": "sha256:1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a",
+  "digest": "sha256:765942a4039992336de8dd5db680586e1a206607dd06170ff0a37267a9e01958",
   "manifest": {
     "schemaVersion": 2,
     "mediaType": "application/vnd.oci.image.index.v1+json",
@@ -11,7 +11,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 1022,
-        "digest": "sha256:029a752048e32e843bd6defe3841186fb8d19a28dae8ec287f433bb9d6d1ad85",
+        "digest": "sha256:008827ed2172a676b08121e21cf9db0ce08a90ee6c8a12fc374af8a56c0e496d",
         "platform": {
           "architecture": "amd64",
           "os": "linux"
@@ -20,7 +20,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 838,
-        "digest": "sha256:5fea95373b9ec85974843f31446fa6a9df4492dddae4e1cb056193c34a20a5be",
+        "digest": "sha256:eaa1a55517a9b7caee112a0f5b2fd541f222413234a035b5b89c812efa82137c",
         "platform": {
           "architecture": "unknown",
           "os": "unknown"
@@ -29,7 +29,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 1023,
-        "digest": "sha256:b4aef1a899e0271f06d948c9a8fa626ecdb2202d3a178bc14775dd559e23df8e",
+        "digest": "sha256:af1169cde24ef30cc22ef332bea3d3454302d23bd508184f8761808048070031",
         "platform": {
           "architecture": "arm",
           "os": "linux",
@@ -39,7 +39,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 566,
-        "digest": "sha256:a4d1e27e63a9d6353046eb25a2f0ec02945012b217f4364cd83a73fe6dfb0b15",
+        "digest": "sha256:c590d048e7be632c6559d39c16735701bb3bba636a82f32aac6834a349b22ca3",
         "platform": {
           "architecture": "unknown",
           "os": "unknown"
@@ -48,7 +48,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 1023,
-        "digest": "sha256:4fdafe217d0922f3c3e2b4f64cf043f8403a4636685cd9c51fea2cbd1f419740",
+        "digest": "sha256:7f94a9bfb82277581c655bacc17bcb07a62b85c6169a1d6ad5df0bde15040e02",
         "platform": {
           "architecture": "arm",
           "os": "linux",
@@ -58,7 +58,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 838,
-        "digest": "sha256:7f21ac2018d95b2c51a5779c1d5ca6c327504adc3b0fdc747a6725d30b3f13c2",
+        "digest": "sha256:b5f0ca7ef2f184953bc22801b7f54293246e220c126f2921313a9b7ea34a5772",
         "platform": {
           "architecture": "unknown",
           "os": "unknown"
@@ -67,7 +67,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 1025,
-        "digest": "sha256:ea3c5a9671f7b3f7eb47eab06f73bc6591df978b0d5955689a9e6f943aa368c0",
+        "digest": "sha256:ca485c6a7b51db176b2b922aae711edb0cc82953424663297f279babaa3c2fb7",
         "platform": {
           "architecture": "arm64",
           "os": "linux",
@@ -77,7 +77,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 838,
-        "digest": "sha256:a8ba68c1a9e6eea8041b4b8f996c235163440808b9654a865976fdcbede0f433",
+        "digest": "sha256:f1a7e0415ff82b0ad0f3aae3dbc9edebb09e63d332698a953ac0c614bb7076ff",
         "platform": {
           "architecture": "unknown",
           "os": "unknown"
@@ -86,7 +86,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 1018,
-        "digest": "sha256:dea9f02e103e837849f984d5679305c758aba7fea1b95b7766218597f61a05ab",
+        "digest": "sha256:aecf0fcf2640d401102308301e4dcc2fa0acb1608e098ae8e7bc97843cb2ca2f",
         "platform": {
           "architecture": "386",
           "os": "linux"
@@ -95,7 +95,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 838,
-        "digest": "sha256:3c6629bec05c8273a927d46b77428bf4a378dad911a0ae284887becdc149b734",
+        "digest": "sha256:77b65d7b3a203c6a06df1b937e7da4fb707b40bd8f424dc892f729182af95b38",
         "platform": {
           "architecture": "unknown",
           "os": "unknown"
@@ -104,7 +104,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 1025,
-        "digest": "sha256:0880443bffa028dfbbc4094a32dd6b7ac25684e4c0a3d50da9e0acae355c5eaf",
+        "digest": "sha256:35b046b830a6f76d7a06aa2506ae082ab549ff3e720c52274d5e1a561de32f1b",
         "platform": {
           "architecture": "ppc64le",
           "os": "linux"
@@ -113,7 +113,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 838,
-        "digest": "sha256:bb48308f976b266e3ab39bbf9af84521959bd9c295d3c763690cf41f8df2a626",
+        "digest": "sha256:bce2e39bac504ae0875b5333680e9d3d0b389f1858fc85b1620161a0e1987eb9",
         "platform": {
           "architecture": "unknown",
           "os": "unknown"
@@ -122,7 +122,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 1025,
-        "digest": "sha256:d76e6fbe348ff20c2931bb7f101e49379648e026de95dd37f96e00ce1909dcf7",
+        "digest": "sha256:232135d832a25a3b20c0f79e642e2e2d635f8282ee022ca0aa81dc701a97b9b7",
         "platform": {
           "architecture": "riscv64",
           "os": "linux"
@@ -131,7 +131,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 838,
-        "digest": "sha256:dd807544365f6dc187cbe6de0806adce2ea9de3e7124717d1d8e8b7a18b77b64",
+        "digest": "sha256:4ebfd85eb89796106d40bff703837b29fe275de7aea0a8e7f05ad77c740e7fad",
         "platform": {
           "architecture": "unknown",
           "os": "unknown"
@@ -140,7 +140,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 1021,
-        "digest": "sha256:b815fadf80495594eb6296a6af0bc647ae5f193e0044e07acec7e5b378c9ce2d",
+        "digest": "sha256:38381f79c1fae0f1d58ae9910bb0793c3ad41d3e9496b6de8b9f3e4332d7a3d8",
         "platform": {
           "architecture": "s390x",
           "os": "linux"
@@ -149,7 +149,7 @@ expression: response
       {
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
         "size": 838,
-        "digest": "sha256:74681be74a280a88abb53ff1e048eb1fb624b30d0066730df6d8afd02ba82e01",
+        "digest": "sha256:20a1f9e3f0411b3fa0e3766c53ab26a52c5e15ec2d172fe6058d6f96008f0d20",
         "platform": {
           "architecture": "unknown",
           "os": "unknown"
