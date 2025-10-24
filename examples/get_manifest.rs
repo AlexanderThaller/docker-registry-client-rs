@@ -1,6 +1,7 @@
 use docker_registry_client::docker::Client;
 
 #[tokio::main]
+#[expect(clippy::dbg_macro, reason = "using dbg! in examples is fine")]
 async fn main() -> Result<(), eyre::Error> {
     let client = Client::new();
 

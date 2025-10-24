@@ -1,16 +1,23 @@
 [package]
 name = "docker-registry-client"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
 
 [dependencies]
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 dyn-clone = "1"
 either = "1"
-redis-macros = { version = "0.4", optional = true }
-redis = { version = "0.27", features = ["tokio-comp", "connection-manager"], optional = true }
-reqwest = { version = "0.12", default-features = false, features = [ "json", "rustls-tls", ] }
+redis-macros = { version = "0.5", optional = true }
+redis = { version = "0.32", features = [
+  "tokio-comp",
+  "connection-manager",
+], optional = true }
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "rustls-tls",
+] }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
@@ -25,6 +32,21 @@ redis_cache = ["redis"]
 eyre = "0.6"
 insta = { version = "1", features = ["json"] }
 pretty_assertions = "1"
+
+[lints.rust]
+#missing-docs = "warn"
+missing-debug-implementations = "warn"
+rust-2018-idioms = "warn"
+unsafe-code = "forbid"
+unused-lifetimes = "warn"
+
+[lints.clippy]
+allow-attributes = "warn"
+allow-attributes-without-reason = "warn"
+dbg-macro = "warn"
+pedantic = "warn"
+todo = "warn"
+unwrap-used = "warn"
 
 [profile.dev.package]
 insta.opt-level = 3
