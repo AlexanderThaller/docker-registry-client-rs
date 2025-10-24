@@ -66,6 +66,13 @@ impl Client {
         self.token_cache = Box::new(token_cache::RedisCache::new(redis_client));
     }
 
+    /// Returns the manifest for the given URL and image.
+    ///
+    /// # Errors
+    /// Returns an error if the request fails.
+    /// Returns an error if the response body is not valid JSON.
+    /// Returns an error if the response body is not a valid manifest.
+    /// Returns an error if the response status is not successful.
     #[tracing::instrument]
     pub async fn get_manifest_url(&self, url: &Url, image: &Image) -> Result<Response, Error> {
         let mut headers = self.get_headers(image).await?;
