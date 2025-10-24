@@ -6,8 +6,8 @@ use std::{
 use chrono::Utc;
 use tokio::sync::RwLock;
 use tracing::{
-    info_span,
     Instrument,
+    info_span,
 };
 
 use crate::docker::token::{

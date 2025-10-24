@@ -1,14 +1,14 @@
 use reqwest::{
-    header::HeaderMap,
     Client as HTTPClient,
+    header::HeaderMap,
 };
 use serde::{
     Deserialize,
     Serialize,
 };
 use tracing::{
-    info_span,
     Instrument,
+    info_span,
 };
 use url::Url;
 

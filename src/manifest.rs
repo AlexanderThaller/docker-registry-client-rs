@@ -5,12 +5,12 @@ use chrono::{
     Utc,
 };
 use serde::{
+    Deserialize,
+    Serialize,
     de::{
         self,
         Deserializer,
     },
-    Deserialize,
-    Serialize,
 };
 use url::Url;
 
