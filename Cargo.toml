@@ -2,7 +2,7 @@
 name = "docker-registry-client"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 
 authors = ["Alexander Thaller <alexander@thaller.ws>"]
 description = "Communicate with Docker Registries to fetch image metadata."
@@ -18,14 +18,14 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 dyn-clone = "1"
 either = "1"
-redis-macros = { version = "0.5", optional = true }
-redis = { version = "0.32", features = [
+redis-macros = { version = "1", optional = true }
+redis = { version = "1", features = [
   "tokio-comp",
   "connection-manager",
 ], optional = true }
-reqwest = { version = "0.12", default-features = false, features = [
+reqwest = { version = "0.13", default-features = false, features = [
   "json",
-  "rustls-tls",
+  "rustls",
 ] }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
