@@ -61,8 +61,12 @@ impl Client {
         self.token_cache = Box::new(token_cache::NoCache);
     }
 
+    /// Caches tokens in Redis using the given [`fred`] client.
+    ///
+    /// The client has to be connected (see
+    /// [`fred::interfaces::ClientLike::init`]) before it is passed in.
     #[cfg(feature = "redis_cache")]
-    pub fn set_cache_redis(&mut self, redis_client: redis::Client) {
+    pub fn set_cache_redis(&mut self, redis_client: fred::clients::Client) {
         self.token_cache = Box::new(token_cache::RedisCache::new(redis_client));
     }
 
