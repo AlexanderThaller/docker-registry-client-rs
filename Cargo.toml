@@ -1,6 +1,6 @@
 [package]
 name = "docker-registry-client"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.87"
 
@@ -18,10 +18,8 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 dyn-clone = "1"
 either = "1"
-redis-macros = { version = "1", optional = true }
-redis = { version = "1", features = [
-  "tokio-comp",
-  "connection-manager",
+fred = { version = "10", default-features = false, features = [
+  "i-keys",
 ], optional = true }
 reqwest = { version = "0.13", default-features = false, features = [
   "json",
@@ -35,7 +33,7 @@ url = { version = "2", features = ["serde"] }
 
 [features]
 default = ["redis_cache"]
-redis_cache = ["redis"]
+redis_cache = ["dep:fred"]
 
 [dev-dependencies]
 eyre = "0.6"
