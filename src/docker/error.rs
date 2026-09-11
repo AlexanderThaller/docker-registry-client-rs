@@ -22,6 +22,13 @@ pub enum Error {
     InvalidImageUrl(crate::image::FromUrlError),
     FetchToken(token_cache::FetchError),
     StoreToken(token_cache::StoreError),
+
+    GetBlob(reqwest::Error),
+    InvalidBlobUrl(url::ParseError),
+    ExtractBlobBody(reqwest::Error),
+    FailedBlobRequest(reqwest::StatusCode, String),
+    ParseBlobAcceptHeader(reqwest::header::InvalidHeaderValue),
+    BlobNotFound(Url),
 }
 
 impl std::fmt::Display for Error {
@@ -61,6 +68,17 @@ impl std::fmt::Display for Error {
             }
             Self::FetchToken(e) => write!(f, "Failed to fetch token from cache: {e}"),
             Self::StoreToken(e) => write!(f, "Failed to store token in cache: {e}"),
+
+            Self::GetBlob(e) => write!(f, "Failed to get blob: {e}"),
+            Self::InvalidBlobUrl(e) => write!(f, "Invalid blob URL: {e}"),
+            Self::ExtractBlobBody(e) => write!(f, "Failed to extract blob body: {e}"),
+            Self::FailedBlobRequest(e, s) => {
+                write!(f, "Failed blob request: status: {e}, body: {s}")
+            }
+            Self::ParseBlobAcceptHeader(e) => {
+                write!(f, "Failed to parse blob accept header: {e}")
+            }
+            Self::BlobNotFound(u) => write!(f, "Blob at url {u} was not found"),
         }
     }
 }
