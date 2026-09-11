@@ -155,6 +155,28 @@ impl std::str::FromStr for Image {
     }
 }
 
+impl Image {
+    /// The path of the image inside of its registry without the tag or digest.
+    ///
+    /// This is what the registry v2 API calls the name of a repository, e.g.
+    /// `library/alpine` or `sigstore/cosign/cosign`.
+    #[must_use]
+    pub fn path(&self) -> String {
+        format!(
+            "{namespace}{repository}{image_name}",
+            namespace = match self.namespace {
+                Some(ref namespace) => format!("{namespace}/"),
+                None => String::new(),
+            },
+            repository = match self.repository {
+                Some(ref repository) => format!("{repository}/"),
+                None => String::new(),
+            },
+            image_name = self.image_name.name
+        )
+    }
+}
+
 impl std::fmt::Display for Image {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -375,6 +397,101 @@ mod tests {
                 let got = INPUT.parse::<Image>().unwrap();
 
                 assert_eq!(expected, got);
+            }
+        }
+
+        mod codeberg {
+            use either::Either;
+            use pretty_assertions::assert_eq;
+
+            use crate::{
+                Image,
+                ImageName,
+                Registry,
+                Tag,
+            };
+
+            #[test]
+            fn forgejo() {
+                const INPUT: &str = "codeberg.org/forgejo/forgejo:1.20.1-0-rootless";
+
+                let expected = Image {
+                    registry: Registry::Codeberg,
+                    namespace: None,
+                    repository: Some("forgejo".to_string()),
+                    image_name: ImageName {
+                        name: "forgejo".to_string(),
+                        identifier: Either::Left(Tag::Specific("1.20.1-0-rootless".to_string())),
+                    },
+                };
+
+                let got = INPUT.parse::<Image>().unwrap();
+
+                assert_eq!(expected, got);
+            }
+        }
+
+        mod unknown_registry {
+            use either::Either;
+            use pretty_assertions::assert_eq;
+
+            use crate::{
+                Image,
+                ImageName,
+                Registry,
+                Tag,
+            };
+
+            #[test]
+            fn public_ecr() {
+                const INPUT: &str = "public.ecr.aws/docker/library/alpine:3.20";
+
+                let expected = Image {
+                    registry: Registry::Other("public.ecr.aws".to_string()),
+                    namespace: Some("docker".to_string()),
+                    repository: Some("library".to_string()),
+                    image_name: ImageName {
+                        name: "alpine".to_string(),
+                        identifier: Either::Left(Tag::Specific("3.20".to_string())),
+                    },
+                };
+
+                let got = INPUT.parse::<Image>().unwrap();
+
+                assert_eq!(expected, got);
+                assert_eq!("docker/library/alpine", got.path());
+            }
+
+            #[test]
+            fn localhost() {
+                const INPUT: &str = "localhost:5000/alpine:3.20";
+
+                let expected = Image {
+                    registry: Registry::Other("localhost:5000".to_string()),
+                    namespace: None,
+                    repository: None,
+                    image_name: ImageName {
+                        name: "alpine".to_string(),
+                        identifier: Either::Left(Tag::Specific("3.20".to_string())),
+                    },
+                };
+
+                let got = INPUT.parse::<Image>().unwrap();
+
+                assert_eq!(expected, got);
+                assert_eq!("alpine", got.path());
+            }
+
+            /// A repository without a registry must not be mistaken for an
+            /// unknown registry.
+            #[test]
+            fn repository_is_not_a_registry() {
+                const INPUT: &str = "prom/prometheus:v2.53.2";
+
+                let got = INPUT.parse::<Image>().unwrap();
+
+                assert_eq!(Registry::DockerHub, got.registry);
+                assert_eq!("prom/prometheus", got.path());
             }
         }
 

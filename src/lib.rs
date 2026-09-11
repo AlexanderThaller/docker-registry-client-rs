@@ -14,6 +14,9 @@ pub use image::{
         digest::Digest,
         tag::Tag,
     },
-    registry::Registry,
+    registry::{
+        Authentication,
+        Registry,
+    },
 };
 pub use manifest::Manifest;

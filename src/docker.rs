@@ -1,5 +1,6 @@
 use reqwest::{
     Client as HTTPClient,
+    StatusCode,
     header::HeaderMap,
 };
 use serde::{
@@ -8,6 +9,7 @@ use serde::{
 };
 use tracing::{
     Instrument,
+    debug,
     info_span,
 };
 use url::Url;
@@ -15,16 +17,29 @@ use url::Url;
 use crate::{
     Image,
     Manifest,
-    Registry,
+    image::registry::Authentication,
 };
 
+mod auth;
 mod error;
 pub mod token;
 pub mod token_cache;
 
+use auth::Challenge;
 pub use error::Error;
 use token::Token;
 use token_cache::Cache as TokenCache;
+
+const ACCEPT: [&str; 8] = [
+    "application/vnd.docker.container.image.v1+json",
+    "application/vnd.docker.distribution.manifest.list.v2+json",
+    "application/vnd.docker.distribution.manifest.v2+json",
+    "application/vnd.docker.image.rootfs.diff.tar.gzip",
+    "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+    "application/vnd.docker.plugin.v1+json",
+    "application/vnd.oci.image.index.v1+json",
+    "application/vnd.oci.image.manifest.v1+json",
+];
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -72,6 +87,11 @@ impl Client {
 
     /// Returns the manifest for the given URL and image.
     ///
+    /// If the registry answers with `401 Unauthorized` and tells us how to
+    /// authenticate in its `WWW-Authenticate` header the token is fetched and
+    /// the request is retried once. This is what makes registries work that
+    /// are not known to this crate.
+    ///
     /// # Errors
     /// Returns an error if the request fails.
     /// Returns an error if the response body is not valid JSON.
@@ -79,36 +99,67 @@ impl Client {
     /// Returns an error if the response status is not successful.
     #[tracing::instrument]
     pub async fn get_manifest_url(&self, url: &Url, image: &Image) -> Result<Response, Error> {
-        let mut headers = self.get_headers(image).await?;
+        let headers = self.get_headers(image).await?;
+        let response = self.request_manifest(url, headers).await?;
 
-        let accept_header = [
-            "application/vnd.docker.container.image.v1+json",
-            "application/vnd.docker.distribution.manifest.list.v2+json",
-            "application/vnd.docker.distribution.manifest.v2+json",
-            "application/vnd.docker.image.rootfs.diff.tar.gzip",
-            "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
-            "application/vnd.docker.plugin.v1+json",
-            "application/vnd.oci.image.index.v1+json",
-            "application/vnd.oci.image.manifest.v1+json",
-        ]
-        .join(", ");
+        let response = match Self::challenge(&response) {
+            Some(challenge) => {
+                debug!("registry asked us to authenticate: {challenge:?}");
 
+                let headers = self.authenticate(image, &challenge).await?;
+
+                self.request_manifest(url, headers).await?
+            }
+
+            None => response,
+        };
+
+        Self::into_response(url, response).await
+    }
+
+    /// # Errors
+    /// Returns an error if the request fails.
+    /// Returns an error if the response body is not valid JSON.
+    /// Returns an error if the response body is not a valid manifest.
+    /// Returns an error if the response status is not successful.
+    #[tracing::instrument(skip_all)]
+    pub async fn get_manifest(&self, image: &Image) -> Result<Response, Error> {
+        let url = Url::parse(&format!(
+            "https://{domain}/v2/{path}/manifests/{identifier}",
+            domain = image.registry.registry_domain(),
+            path = image.path(),
+            identifier = image.image_name.identifier
+        ))
+        .map_err(Error::InvalidManifestUrl)?;
+
+        self.get_manifest_url(&url, image).await
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn request_manifest(
+        &self,
+        url: &Url,
+        mut headers: HeaderMap,
+    ) -> Result<reqwest::Response, Error> {
         headers.insert(
             "Accept",
-            accept_header
+            ACCEPT
+                .join(", ")
                 .parse()
                 .map_err(Error::ParseManifestAcceptHeader)?,
         );
 
-        let response = self
-            .client
+        self.client
             .get(url.as_str())
             .headers(headers)
             .send()
             .instrument(info_span!("get manifest request"))
             .await
-            .map_err(Error::GetManifest)?;
+            .map_err(Error::GetManifest)
+    }
 
+    #[tracing::instrument(skip_all)]
+    async fn into_response(url: &Url, response: reqwest::Response) -> Result<Response, Error> {
         let status = response.status();
 
         let digest = response
@@ -129,7 +180,7 @@ impl Client {
             .map_err(Error::ExtractManifestBody)?;
 
         if !status.is_success() {
-            if status == reqwest::StatusCode::NOT_FOUND {
+            if status == StatusCode::NOT_FOUND {
                 return Err(Error::ManifestNotFound(url.clone()));
             }
 
@@ -142,104 +193,85 @@ impl Client {
         Ok(Response { digest, manifest })
     }
 
-    /// # Errors
-    /// Returns an error if the request fails.
-    /// Returns an error if the response body is not valid JSON.
-    /// Returns an error if the response body is not a valid manifest.
-    /// Returns an error if the response status is not successful.
-    #[tracing::instrument(skip_all)]
-    pub async fn get_manifest(&self, image: &Image) -> Result<Response, Error> {
-        let registry_domain = image.registry.registry_domain();
+    /// The bearer challenge the registry answered an unauthorized request with.
+    ///
+    /// Returns [`None`] if the request was not rejected or if the registry does
+    /// not tell us how to get a token.
+    fn challenge(response: &reqwest::Response) -> Option<Challenge> {
+        if response.status() != StatusCode::UNAUTHORIZED {
+            return None;
+        }
 
-        let url = Url::parse(&format!(
-            "https://{domain}/v2/{namespace}{repository}{image_name}/manifests/{identifier}",
-            domain = registry_domain,
-            namespace = match image.namespace {
-                Some(ref namespace) => format!("{namespace}/"),
-                None => String::new(),
-            },
-            repository = match image.repository {
-                Some(ref repository) => format!("{repository}/"),
-                None => String::new(),
-            },
-            image_name = image.image_name.name,
-            identifier = image.image_name.identifier
-        ))
-        .map_err(Error::InvalidManifestUrl)?;
+        let header = response
+            .headers()
+            .get(reqwest::header::WWW_AUTHENTICATE)?
+            .to_str()
+            .ok()?;
 
-        self.get_manifest_url(&url, image).await
+        Challenge::from_www_authenticate(header)
     }
 
+    /// Headers for a manifest request of the given image.
+    ///
+    /// Registries that are known to need a token get one upfront, for every
+    /// other registry we try without a token first and let
+    /// [`Client::get_manifest_url`] handle the challenge we might get back.
     #[tracing::instrument(skip_all)]
     async fn get_headers(&self, image: &Image) -> Result<HeaderMap, Error> {
-        if !image.registry.needs_authentication() {
+        let authentication = image.registry.authentication();
+
+        if authentication == Authentication::None {
             return Ok(HeaderMap::new());
         }
 
-        let cache_key = image.into();
-
-        let token = self
+        if let Some(token) = self
             .token_cache
-            .fetch(&cache_key)
+            .fetch(&image.into())
             .await
-            .map_err(Error::FetchToken)?;
+            .map_err(Error::FetchToken)?
+        {
+            return token.try_into().map_err(Error::ParseAuthorizationHeader);
+        }
 
-        let token = if let Some(token) = token {
-            token
-        } else {
-            let namespace = match &image.namespace {
-                Some(namespace) => format!("{namespace}/"),
-                None => String::new(),
-            };
+        match Challenge::try_from(authentication) {
+            Ok(challenge) => self.authenticate(image, &challenge).await,
+            Err(()) => Ok(HeaderMap::new()),
+        }
+    }
 
-            let repository = match &image.repository {
-                Some(repository) => format!("{repository}/"),
-                None => String::new(),
-            };
+    /// Fetches a token for the given image following the given challenge and
+    /// returns the headers to authenticate with.
+    #[tracing::instrument(skip_all)]
+    async fn authenticate(&self, image: &Image, challenge: &Challenge) -> Result<HeaderMap, Error> {
+        let scope = format!("repository:{path}:pull", path = image.path());
 
-            let token_url = match image.registry {
-                Registry::Github => format!(
-                    "https://ghcr.io/token?scope=repository:{namespace}{repository}{image_name}:pull&service=ghcr.io",
-                    image_name = image.image_name.name
-                ),
+        let token_url = challenge
+            .token_url(&scope)
+            .map_err(Error::InvalidTokenUrl)?;
 
-                Registry::DockerHub => format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:{namespace}{repository}{image_name}:pull&service=registry.docker.io", image_name = image.image_name.name),
+        let response = self
+            .client
+            .get(token_url)
+            .send()
+            .instrument(info_span!("get token request"))
+            .await
+            .map_err(Error::GetToken)?;
 
-                Registry::Quay => format!("https://quay.io/v2/auth?scope=repository:{namespace}{repository}{image_name}:pull&service=quay.io", image_name = image.image_name.name),
+        let body = response
+            .text()
+            .instrument(info_span!("extract token request body"))
+            .await
+            .map_err(Error::ExtractTokenBody)?;
 
-                Registry::RedHat | Registry::K8s | Registry::Google | Registry::Microsoft => return Ok(HeaderMap::new()),
-            };
+        let token: Token =
+            serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
 
-            let token_url = Url::parse(&token_url).map_err(Error::InvalidTokenUrl)?;
+        self.token_cache
+            .store(image.into(), token.clone())
+            .await
+            .map_err(Error::StoreToken)?;
 
-            let response = self
-                .client
-                .get(token_url)
-                .send()
-                .instrument(info_span!("get token request"))
-                .await
-                .map_err(Error::GetToken)?;
-
-            let body = response
-                .text()
-                .instrument(info_span!("extract token request body"))
-                .await
-                .map_err(Error::ExtractTokenBody)?;
-
-            let token: Token =
-                serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
-
-            self.token_cache
-                .store(cache_key, token.clone())
-                .await
-                .map_err(Error::StoreToken)?;
-
-            token
-        };
-
-        let headers = token.try_into().map_err(Error::ParseAuthorizationHeader)?;
-
-        Ok(headers)
+        token.try_into().map_err(Error::ParseAuthorizationHeader)
     }
 }
 
@@ -319,6 +351,38 @@ mod tests {
         #[tokio::test]
         async fn playwright() {
             const INPUT: &str = "mcr.microsoft.com/playwright:v1.48.2-noble";
+
+            let client = Client::new();
+            let image = INPUT.parse().unwrap();
+            let response = client.get_manifest(&image).await.unwrap();
+
+            insta::assert_json_snapshot!(response);
+        }
+    }
+
+    mod codeberg {
+        use crate::Client;
+
+        #[tokio::test]
+        async fn forgejo() {
+            const INPUT: &str = "codeberg.org/forgejo/forgejo:1.20.1-0-rootless";
+
+            let client = Client::new();
+            let image = INPUT.parse().unwrap();
+            let response = client.get_manifest(&image).await.unwrap();
+
+            insta::assert_json_snapshot!(response);
+        }
+    }
+
+    /// Registries that are not known to this crate are talked to by
+    /// discovering their authentication from the `WWW-Authenticate` header.
+    mod unknown_registry {
+        use crate::Client;
+
+        #[tokio::test]
+        async fn public_ecr() {
+            const INPUT: &str = "public.ecr.aws/docker/library/alpine:3.20";
 
             let client = Client::new();
             let image = INPUT.parse().unwrap();
