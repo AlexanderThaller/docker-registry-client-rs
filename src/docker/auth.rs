@@ -72,6 +72,16 @@ impl Challenge {
     }
 }
 
+/// Whether the value of a `WWW-Authenticate` header is a basic challenge,
+/// i.e. whether the registry wants the username and password on the request
+/// itself rather than a token.
+pub(super) fn is_basic(header: &str) -> bool {
+    header
+        .trim_start()
+        .strip_prefix_ignore_ascii_case("basic")
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
+}
+
 impl TryFrom<Authentication> for Challenge {
     type Error = ();
 
@@ -145,6 +155,24 @@ impl StripPrefixIgnoreAsciiCase for str {
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod tests {
+    mod is_basic {
+        use crate::docker::auth::is_basic;
+
+        #[test]
+        fn basic_challenges() {
+            assert!(is_basic(r#"Basic realm="registry""#));
+            assert!(is_basic(r#"basic realm="registry""#));
+            assert!(is_basic("Basic"));
+        }
+
+        #[test]
+        fn anything_else() {
+            assert!(!is_basic(r#"Bearer realm="https://example.com/token""#));
+            assert!(!is_basic("Basically"));
+            assert!(!is_basic(""));
+        }
+    }
+
     mod from_www_authenticate {
         use pretty_assertions::assert_eq;
 

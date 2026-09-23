@@ -4,6 +4,7 @@ pub mod manifest;
 
 pub use docker::{
     Client,
+    Credentials,
     Error as ClientError,
     Response,
 };

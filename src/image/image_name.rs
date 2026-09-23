@@ -37,15 +37,13 @@ impl std::error::Error for FromStrError {}
 
 impl std::fmt::Display for ImageName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{image_name}:{identifier}",
-            image_name = self.name,
-            identifier = match &self.identifier {
-                Either::Left(tag) => tag.to_string(),
-                Either::Right(digest) => digest.to_string(),
-            }
-        )
+        // A tag follows the name after a `:`, a digest after an `@` -- the
+        // same split `from_str` makes, so what is printed parses back into the
+        // same name. `name:sha256:...` is not a reference anything accepts.
+        match &self.identifier {
+            Either::Left(tag) => write!(f, "{name}:{tag}", name = self.name),
+            Either::Right(digest) => write!(f, "{name}@{digest}", name = self.name),
+        }
     }
 }
 

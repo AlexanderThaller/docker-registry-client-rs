@@ -68,8 +68,8 @@ impl std::str::FromStr for Image {
 
         // alpine
         // prom/prometheus:v2.53.2
-        // quay.io/openshift-community-operators/external-secrets-operator:v0.9.9
-        // registry.access.redhat.com/ubi8:8.9
+        // quay.io/openshift-community-operators/external-secrets-operator:v0.9.
+        // 9 registry.access.redhat.com/ubi8:8.9
         match components.as_slice() {
             [] => Err(FromStrError::MissingFirstComponent),
 
@@ -101,8 +101,8 @@ impl std::str::FromStr for Image {
                         image_name,
                     })
                 } else {
-                    // Case where we have a repository and a docker image name as the registry
-                    // could not be parsed
+                    // Case where we have a repository and a docker image name
+                    // as the registry could not be parsed
                     let repository = (*registry_or_repository).to_string();
                     let image_name = image_name.parse().map_err(Self::Err::ParseImageName)?;
 
@@ -305,6 +305,21 @@ mod tests {
                 .unwrap();
 
             assert_eq!(expected, got);
+        }
+
+        /// A digest reference prints with the `@` it was parsed from, so it
+        /// survives being handed on as a string -- to a scanner, or through
+        /// `Serialize` and back.
+        #[test]
+        fn digest_round_trip() {
+            const INPUT: &str =
+                "quay.io/openshift-community-operators/external-secrets-operator@sha256:\
+                 2247f14d217577b451727b3015f95e97d47941e96b99806f8589a34c43112ec3";
+
+            let image = INPUT.parse::<Image>().unwrap();
+
+            assert_eq!(INPUT, image.to_string());
+            assert_eq!(image, image.to_string().parse::<Image>().unwrap());
         }
 
         mod dockerhub {

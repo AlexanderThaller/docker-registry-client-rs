@@ -51,6 +51,60 @@ const BLOB_ACCEPT: &str = "application/octet-stream, */*";
 pub struct Client {
     client: HTTPClient,
     token_cache: Box<dyn TokenCache + Send>,
+    credentials: Option<Credentials>,
+}
+
+/// A username and password to pull with, for a registry that does not let
+/// everyone pull.
+///
+/// `Debug` shows the username only, so a client carrying credentials can be
+/// logged and traced like one that does not.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Credentials {
+    username: String,
+    password: String,
+}
+
+impl Credentials {
+    #[must_use]
+    pub fn new(username: impl Into<String>, password: impl Into<String>) -> Self {
+        Self {
+            username: username.into(),
+            password: password.into(),
+        }
+    }
+
+    /// For handing the credentials on to another client pulling from the same
+    /// registry, e.g. one that verifies signatures.
+    #[must_use]
+    pub fn username(&self) -> &str {
+        &self.username
+    }
+
+    /// See [`Credentials::username`].
+    #[must_use]
+    pub fn password(&self) -> &str {
+        &self.password
+    }
+}
+
+impl std::fmt::Debug for Credentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Credentials")
+            .field("username", &self.username)
+            .field("password", &"REDACTED")
+            .finish()
+    }
+}
+
+/// What a request to the registry is sent with to say who is asking.
+enum Authorization {
+    /// No header at all, or the bearer token the registry handed out.
+    Headers(HeaderMap),
+
+    /// The [`Credentials`] themselves, for a registry that answered with a
+    /// `Basic` challenge rather than pointing us at a token service.
+    Basic,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +118,7 @@ impl Default for Client {
         Self {
             client: HTTPClient::new(),
             token_cache: Box::new(token_cache::MemoryTokenCache::default()),
+            credentials: None,
         }
     }
 }
@@ -91,6 +146,30 @@ impl Client {
         self.token_cache = Box::new(token_cache::RedisCache::new(redis_client));
     }
 
+    /// A client that pulls as the given user rather than anonymously.
+    ///
+    /// Shares this client's connection pool but not its token cache: a token
+    /// fetched with credentials grants what those credentials grant, and the
+    /// cache it would otherwise land in is keyed by the image alone and may be
+    /// shared with every other caller through redis. The returned client keeps
+    /// its tokens in memory, for as long as it lives, and nobody else reads
+    /// them.
+    #[must_use]
+    pub fn with_credentials(&self, credentials: Credentials) -> Self {
+        Self {
+            client: self.client.clone(),
+            token_cache: Box::new(token_cache::MemoryTokenCache::default()),
+            credentials: Some(credentials),
+        }
+    }
+
+    /// Whether this client pulls with [`Credentials`], i.e. whether what it
+    /// fetches may be something an anonymous caller is not allowed to see.
+    #[must_use]
+    pub fn has_credentials(&self) -> bool {
+        self.credentials.is_some()
+    }
+
     /// Returns the manifest for the given URL and image.
     ///
     /// If the registry answers with `401 Unauthorized` and tells us how to
@@ -106,17 +185,12 @@ impl Client {
     #[tracing::instrument]
     pub async fn get_manifest_url(&self, url: &Url, image: &Image) -> Result<Response, Error> {
         let headers = self.get_headers(image).await?;
-        let response = self.request_manifest(url, headers).await?;
+        let response = self
+            .request_manifest(url, Authorization::Headers(headers))
+            .await?;
 
-        let response = match Self::challenge(&response) {
-            Some(challenge) => {
-                debug!("registry asked us to authenticate: {challenge:?}");
-
-                let headers = self.authenticate(image, &challenge).await?;
-
-                self.request_manifest(url, headers).await?
-            }
-
+        let response = match self.reauthorize(image, &response).await? {
+            Some(authorization) => self.request_manifest(url, authorization).await?,
             None => response,
         };
 
@@ -162,48 +236,57 @@ impl Client {
         .map_err(Error::InvalidBlobUrl)?;
 
         let headers = self.get_headers(image).await?;
-        let response = self.request_blob(&url, headers).await?;
+        let response = self
+            .request_blob(&url, Authorization::Headers(headers))
+            .await?;
 
-        let response = match Self::challenge(&response) {
-            Some(challenge) => {
-                debug!("registry asked us to authenticate: {challenge:?}");
-
-                let headers = self.authenticate(image, &challenge).await?;
-
-                self.request_blob(&url, headers).await?
-            }
-
+        let response = match self.reauthorize(image, &response).await? {
+            Some(authorization) => self.request_blob(&url, authorization).await?,
             None => response,
         };
 
         Self::into_blob_response(&url, response).await
     }
 
-    /// Builds the `GET` request for the given URL and headers, inserting the
-    /// given `Accept` header.
+    /// Builds the `GET` request for the given URL, authorized the given way,
+    /// with the given `Accept` header.
     fn build_request(
         &self,
         url: &Url,
-        mut headers: HeaderMap,
+        authorization: Authorization,
         accept: reqwest::header::HeaderValue,
     ) -> RequestBuilder {
-        headers.insert("Accept", accept);
+        let request = self.client.get(url.as_str()).header("Accept", accept);
 
-        self.client.get(url.as_str()).headers(headers)
+        match authorization {
+            Authorization::Headers(headers) => request.headers(headers),
+            Authorization::Basic => self.with_basic_auth(request),
+        }
+    }
+
+    /// Adds the credentials to the request as basic authentication, if this
+    /// client has any.
+    fn with_basic_auth(&self, request: RequestBuilder) -> RequestBuilder {
+        match &self.credentials {
+            Some(credentials) => {
+                request.basic_auth(&credentials.username, Some(&credentials.password))
+            }
+            None => request,
+        }
     }
 
     #[tracing::instrument(skip_all)]
     async fn request_manifest(
         &self,
         url: &Url,
-        headers: HeaderMap,
+        authorization: Authorization,
     ) -> Result<reqwest::Response, Error> {
         let accept = ACCEPT
             .join(", ")
             .parse()
             .map_err(Error::ParseManifestAcceptHeader)?;
 
-        self.build_request(url, headers, accept)
+        self.build_request(url, authorization, accept)
             .send()
             .instrument(info_span!("get manifest request"))
             .await
@@ -214,11 +297,11 @@ impl Client {
     async fn request_blob(
         &self,
         url: &Url,
-        headers: HeaderMap,
+        authorization: Authorization,
     ) -> Result<reqwest::Response, Error> {
         let accept = BLOB_ACCEPT.parse().map_err(Error::ParseBlobAcceptHeader)?;
 
-        self.build_request(url, headers, accept)
+        self.build_request(url, authorization, accept)
             .send()
             .instrument(info_span!("get blob request"))
             .await
@@ -284,22 +367,48 @@ impl Client {
         Ok(body.to_vec())
     }
 
-    /// The bearer challenge the registry answered an unauthorized request with.
+    /// How to retry a request the registry rejected, following the challenge
+    /// it answered with.
     ///
-    /// Returns [`None`] if the request was not rejected or if the registry does
-    /// not tell us how to get a token.
-    fn challenge(response: &reqwest::Response) -> Option<Challenge> {
+    /// A bearer challenge is answered with a token from the realm it names,
+    /// asked for with the credentials if this client has any. A basic
+    /// challenge can only be answered with the credentials themselves, so
+    /// without them there is nothing to retry with.
+    ///
+    /// Returns [`None`] if the request was not rejected, or if the registry
+    /// does not say how to authenticate in a way we can follow.
+    async fn reauthorize(
+        &self,
+        image: &Image,
+        response: &reqwest::Response,
+    ) -> Result<Option<Authorization>, Error> {
         if response.status() != StatusCode::UNAUTHORIZED {
-            return None;
+            return Ok(None);
         }
 
-        let header = response
+        let Some(header) = response
             .headers()
-            .get(reqwest::header::WWW_AUTHENTICATE)?
-            .to_str()
-            .ok()?;
+            .get(reqwest::header::WWW_AUTHENTICATE)
+            .and_then(|header| header.to_str().ok())
+        else {
+            return Ok(None);
+        };
 
-        Challenge::from_www_authenticate(header)
+        if let Some(challenge) = Challenge::from_www_authenticate(header) {
+            debug!("registry asked us to authenticate: {challenge:?}");
+
+            let headers = self.authenticate(image, &challenge).await?;
+
+            return Ok(Some(Authorization::Headers(headers)));
+        }
+
+        if self.has_credentials() && auth::is_basic(header) {
+            debug!("registry asked us for basic authentication");
+
+            return Ok(Some(Authorization::Basic));
+        }
+
+        Ok(None)
     }
 
     /// Headers for a manifest request of the given image.
@@ -340,19 +449,31 @@ impl Client {
             .token_url(&scope)
             .map_err(Error::InvalidTokenUrl)?;
 
+        // With credentials the token is asked for as that user, which is how a
+        // registry behind a token service lets a private repository be pulled:
+        // the token service checks the password and hands out a token scoped
+        // to what the user may pull.
         let response = self
-            .client
-            .get(token_url)
+            .with_basic_auth(self.client.get(token_url))
             .send()
             .instrument(info_span!("get token request"))
             .await
             .map_err(Error::GetToken)?;
+
+        let status = response.status();
 
         let body = response
             .text()
             .instrument(info_span!("extract token request body"))
             .await
             .map_err(Error::ExtractTokenBody)?;
+
+        // Checked before the body is read as a token, so wrong credentials are
+        // reported as what the token service said about them rather than as a
+        // token that failed to deserialize.
+        if !status.is_success() {
+            return Err(Error::FailedTokenRequest(status, body));
+        }
 
         let token: Token =
             serde_json::from_str(&body).map_err(|e| Error::DeserializeToken(e, body))?;
@@ -369,6 +490,70 @@ impl Client {
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod tests {
+    mod credentials {
+        use crate::{
+            Client,
+            Credentials,
+            Image,
+            docker::token::Token,
+        };
+
+        #[test]
+        fn debug_redacts_the_password() {
+            let credentials = Credentials::new("user", "hunter2");
+
+            let debug = format!("{credentials:?}");
+
+            assert!(debug.contains("user"), "{debug}");
+            assert!(!debug.contains("hunter2"), "{debug}");
+        }
+
+        #[test]
+        fn a_client_with_credentials_says_so() {
+            let client = Client::new();
+
+            assert!(!client.has_credentials());
+            assert!(
+                client
+                    .with_credentials(Credentials::new("user", "hunter2"))
+                    .has_credentials()
+            );
+        }
+
+        /// A token fetched with credentials must not be handed to the client
+        /// the credentialed one was made from, nor the other way around.
+        #[tokio::test]
+        async fn a_client_with_credentials_has_a_token_cache_of_its_own() {
+            let client = Client::new();
+            let credentialed = client.with_credentials(Credentials::new("user", "hunter2"));
+
+            let image: Image = "registry.example.com/private/image:1".parse().unwrap();
+
+            credentialed
+                .token_cache
+                .store((&image).into(), Token::default())
+                .await
+                .unwrap();
+
+            assert!(
+                client
+                    .token_cache
+                    .fetch(&(&image).into())
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                credentialed
+                    .token_cache
+                    .fetch(&(&image).into())
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
+        }
+    }
+
     mod dockerhub {
         use crate::{
             Client,

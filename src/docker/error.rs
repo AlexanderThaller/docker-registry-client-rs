@@ -16,6 +16,7 @@ pub enum Error {
 
     InvalidTokenUrl(url::ParseError),
     GetToken(reqwest::Error),
+    FailedTokenRequest(reqwest::StatusCode, String),
     ExtractTokenBody(reqwest::Error),
     DeserializeToken(serde_json::Error, String),
     ParseAuthorizationHeader(reqwest::header::InvalidHeaderValue),
@@ -56,6 +57,9 @@ impl std::fmt::Display for Error {
 
             Self::InvalidTokenUrl(e) => write!(f, "Invalid token URL: {e}"),
             Self::GetToken(e) => write!(f, "Failed to get token: {e}"),
+            Self::FailedTokenRequest(e, s) => {
+                write!(f, "Failed token request: status: {e}, body: {s}")
+            }
             Self::ExtractTokenBody(e) => write!(f, "Failed to extract token body: {e}"),
             Self::DeserializeToken(e, s) => {
                 write!(f, "Failed to deserialize token: {e}, body: {s}")
